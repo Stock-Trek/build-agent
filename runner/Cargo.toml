@@ -1,0 +1,12 @@
+[package]
+name = "runner"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+chrono.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+stock-trek.workspace = true
+uuid.workspace = true

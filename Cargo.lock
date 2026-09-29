@@ -122,6 +122,7 @@ name = "build-agent"
 version = "0.1.0"
 dependencies = [
  "lambda_runtime",
+ "proto-gen",
  "thiserror",
  "tokio",
  "tracing",
