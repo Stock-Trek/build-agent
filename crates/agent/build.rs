@@ -3,6 +3,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ancestors()
         .nth(2)
         .unwrap();
-    proto_gen::generate(&root.join("proto"), &root.join("runner/src/generated"))?;
+    let proto_dir = root.join("proto");
+    println!("cargo::rerun-if-changed={}", proto_dir.display());
+    proto_gen::generate(&proto_dir, &root.join("runner/src/generated"))?;
     Ok(())
 }

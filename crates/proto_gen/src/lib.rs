@@ -8,11 +8,12 @@ pub fn generate(proto_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::err
     }
     std::fs::create_dir_all(out_dir)?;
 
-    let protos: Vec<_> = std::fs::read_dir(proto_dir)?
+    let mut protos: Vec<_> = std::fs::read_dir(proto_dir)?
         .filter_map(|e| e.ok())
         .map(|e| e.path())
         .filter(|p| p.extension().is_some_and(|ext| ext == "proto"))
         .collect();
+    protos.sort();
 
     let protoc = protoc_bin_vendored::protoc_bin_path()?;
     unsafe {
@@ -22,6 +23,13 @@ pub fn generate(proto_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::err
     prost_build::Config::new()
         .out_dir(out_dir)
         .compile_protos(&protos, &[proto_dir])?;
+
+    let dto_path = out_dir.join("dto.rs");
+    let generated = std::fs::read_to_string(&dto_path)?;
+    std::fs::write(
+        &dto_path,
+        format!("#![cfg_attr(rustfmt, rustfmt::skip)]\n{generated}"),
+    )?;
 
     let mod_path = out_dir.join("mod.rs");
     let contents = "pub mod dto;\n";
