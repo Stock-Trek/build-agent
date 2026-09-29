@@ -8,10 +8,10 @@ crate-type = ["lib"]
 
 [dependencies]
 prost.workspace = true
+protoc-bin-vendored.workspace = true
 serde.workspace = true
 
 [build-dependencies]
 prost.workspace = true
 prost-types.workspace = true
 prost-build.workspace = true
-protoc-bin-vendored.workspace = true
