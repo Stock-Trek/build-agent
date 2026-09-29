@@ -10,5 +10,5 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
-[build.dependencies]
+[build-dependencies]
 proto-gen = { path = "../proto_gen" }
