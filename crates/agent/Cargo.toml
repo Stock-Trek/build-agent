@@ -1,0 +1,9 @@
+[package]
+name = "build-agent"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+lambda_runtime.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

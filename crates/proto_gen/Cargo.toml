@@ -1,0 +1,12 @@
+[package]
+name = "proto-gen"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[build-dependencies]
+prost.workspace = true
+prost-types.workspace = true
+prost-build.workspace = true
