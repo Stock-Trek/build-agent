@@ -1,14 +1,17 @@
 [package]
-name = "runner"
+name = "dto"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+crate-type = ["lib"]
+
 [dependencies]
-chrono.workspace = true
-dto = { path = "../crates/dto" }
 prost.workspace = true
 rust_decimal.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 stock-trek.workspace = true
-uuid.workspace = true
+
+[build-dependencies]
+proto-gen = { path = "../proto_gen" }

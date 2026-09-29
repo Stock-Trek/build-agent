@@ -122,7 +122,6 @@ name = "build-agent"
 version = "0.1.0"
 dependencies = [
  "lambda_runtime",
- "proto-gen",
  "thiserror",
  "tokio",
  "tracing",
@@ -275,6 +274,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
 dependencies = [
  "serde_core",
+]
+
+[[package]]
+name = "dto"
+version = "0.1.0"
+dependencies = [
+ "prost",
+ "proto-gen",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "stock-trek",
 ]
 
 [[package]]
@@ -1249,6 +1260,7 @@ name = "runner"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "dto",
  "prost",
  "rust_decimal",
  "serde",
