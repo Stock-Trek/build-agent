@@ -23,5 +23,8 @@ pub fn generate(proto_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::err
         .out_dir(out_dir)
         .compile_protos(&protos, &[proto_dir])?;
 
+    let mod_path = out_dir.join("mod.rs");
+    let contents = "pub mod dto;";
+    std::fs::write(mod_path, contents)?;
     Ok(())
 }
