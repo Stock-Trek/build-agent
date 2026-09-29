@@ -1,1 +1,1 @@
-pub mod user_algorithm;
+pub mod algorithm;
