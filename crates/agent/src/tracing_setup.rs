@@ -14,8 +14,7 @@ impl TracingSetup {
                 return Err(BAError::Config(format!(
                     "{} is not valid UTF-8",
                     EnvFilter::DEFAULT_ENV
-                ))
-                .into());
+                )));
             }
         };
         let subscriber = Subscriber::builder()
