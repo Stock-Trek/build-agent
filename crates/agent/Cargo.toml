@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-lambda_runtime.workspace = true
+axum.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true

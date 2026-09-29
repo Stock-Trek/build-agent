@@ -13,10 +13,10 @@ aws-sdk-dynamodb = "1"
 aws-sdk-s3 = "1"
 aws-sdk-sqs = "1"
 aws-smithy-types = "1"
+axum = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 flate2 = "1"
 jsonwebtoken = { version = "10", default-features = false, features = ["use_pem"] }
-lambda_runtime = "1"
 libc = "0.2"
 octocrab = "0.54"
 prost = "0.14"
