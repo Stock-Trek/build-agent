@@ -22,7 +22,8 @@ COPY crates ./crates
 COPY proto ./proto
 COPY runner ./runner
 
-RUN cargo build --release --package build-agent
+RUN cargo build --release --package build-agent \
+ && cargo build --release --package runner --bin build-runner
 
 
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023-minimal
@@ -57,11 +58,12 @@ RUN case "${TARGETARCH}" in \
 
 WORKDIR /app
 COPY --from=builder /app/target/release/build-agent /usr/local/bin/build-agent
+COPY --from=builder /app/target/release/build-runner /usr/local/bin/build-runner
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY runner ./runner
 
-RUN cargo build --manifest-path ./runner/Cargo.toml --target=wasm32-wasip1 --release
+RUN cargo build --manifest-path ./runner/Cargo.toml --target=wasm32-wasip1 --release --lib
 
 EXPOSE 8080
 

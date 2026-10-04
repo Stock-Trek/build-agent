@@ -20,6 +20,7 @@ pub unsafe extern "C" fn entry(argc: i32, argv: *const *const c_char) -> i32 {
     let command = match args[1].as_str() {
         "Algorithm" => Command::Algorithm,
         "Execute" => Command::Execute,
+        "Metadata" => Command::Metadata,
         "Preferences" => Command::Preferences,
         "Signals" => Command::Signals,
         _ => return SERVER_ENTRY_FAILED_TO_PARSE_COMMAND,
