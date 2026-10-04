@@ -66,11 +66,11 @@ jobs:
             echo "Tag ${GIT_TAG} already exists"
             exit 0
           else
-            echo "Creating tag ${TAG}"
+            echo "Creating tag ${GIT_TAG}"
             git config user.name "github-actions[bot]"
             git config user.email 'CreateTags[bot]@users.noreply.github.com'
-            git tag "${TAG}"
-            git push origin "${TAG}"
+            git tag "${GIT_TAG}"
+            git push origin "${GIT_TAG}"
             echo "image-master=${IMAGE_PREFIX}:master" >> $GITHUB_OUTPUT
             echo "image-versioned=${IMAGE_PREFIX}:${VERSIONED}" >> $GITHUB_OUTPUT
           fi
