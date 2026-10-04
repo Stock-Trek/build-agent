@@ -59,7 +59,6 @@ WORKDIR /app
 COPY --from=builder /app/target/release/build-agent /usr/local/bin/build-agent
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
-COPY proto ./proto
 COPY runner ./runner
 
 RUN cargo build --manifest-path ./runner/Cargo.toml --target=wasm32-wasip1 --release
