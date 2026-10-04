@@ -5,7 +5,7 @@ on:
     branches: master
 
 jobs:
-  build-lambda:
+  build-image:
     runs-on: ubuntu-latest
     permissions:
       contents: read
