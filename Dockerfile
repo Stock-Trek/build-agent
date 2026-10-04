@@ -1,4 +1,4 @@
-FROM ghcr.io/cargo-lambda/cargo-lambda:latest AS builder
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS builder
 
 WORKDIR /app
 COPY ./src ./src
@@ -12,12 +12,11 @@ RUN cp target/lambda/algorithm-compiler/bootstrap .
 
 
 
-FROM public.ecr.aws/lambda/provided:al2023
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023-minimal
 
 RUN dnf install -y \
     clang \
     gcc \
-    git \
     protobuf-compiler \
     tar \
     xz \
