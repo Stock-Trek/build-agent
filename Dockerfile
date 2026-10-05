@@ -1,12 +1,13 @@
 FROM ghcr.io/cargo-lambda/cargo-lambda:latest AS builder
 
 WORKDIR /app
-COPY ./src ./src
+COPY ./crates ./crates
+COPY ./proto ./proto
+COPY ./runner ./runner
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 
 RUN cargo lambda build --release
-RUN cp target/lambda/algorithm-compiler/bootstrap .
 
 
 
@@ -17,7 +18,6 @@ FROM public.ecr.aws/lambda/provided:al2023
 RUN dnf install -y \
     clang \
     gcc \
-    git \
     protobuf-compiler \
     tar \
     xz \
@@ -37,9 +37,6 @@ RUN curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/v43.
  && rm -rf wasmtime-v43.0.1-x86_64-linux*
 
 WORKDIR ${LAMBDA_RUNTIME_DIR}
-COPY --from=builder /app/bootstrap .
-COPY ./algorithm-runner ./algorithm-runner
-
-RUN cargo build --manifest-path ./algorithm-runner/Cargo.toml --target=wasm32-wasip1 --release
+COPY --from=builder /app/target/lambda/build-agent/bootstrap .
 
 CMD ["bootstrap"]
