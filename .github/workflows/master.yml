@@ -59,7 +59,7 @@ jobs:
           AWS_REGION: ${{ env.AWS_REGION }}
         run: |
           VERSION=$(cargo pkgid --package build-agent | rev | cut -d '@' -f 1 | cut -d '#' -f 1 | rev)
-          IMAGE_PREFIX="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/build-agent"
+          IMAGE_PREFIX="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/stock-trek-build-agent"
           GIT_TAG="v${VERSION}"
           if git ls-remote --tags origin "refs/tags/${GIT_TAG}" | grep -q "refs/tags/${GIT_TAG}"; then
             echo "Tag ${GIT_TAG} already exists"
