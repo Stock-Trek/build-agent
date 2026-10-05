@@ -72,7 +72,7 @@ jobs:
             git push origin "${GIT_TAG}"
             echo "tag-exists=false" >> $GITHUB_OUTPUT
             echo "image-master=${IMAGE_PREFIX}:master" >> $GITHUB_OUTPUT
-            echo "image-versioned=${IMAGE_PREFIX}:${VERSIONED}" >> $GITHUB_OUTPUT
+            echo "image-versioned=${IMAGE_PREFIX}:${VERSION}" >> $GITHUB_OUTPUT
           fi
 
       - name: Configure AWS credentials
