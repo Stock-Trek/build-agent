@@ -80,10 +80,10 @@ jobs:
         env:
           AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ env.AWS_REGION }}
-          AWS_ROLE_UPDATE_BUILD_AGENT_IMAGE: ${{ env.AWS_ROLE_UPDATE_BUILD_AGENT_IMAGE }}
+          AWS_ROLE_UPDATE_LAMBDA_BUILD_AGENT_RUST: ${{ env.AWS_ROLE_UPDATE_LAMBDA_BUILD_AGENT_RUST }}
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: "arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.AWS_ROLE_UPDATE_BUILD_AGENT_IMAGE }}"
+          role-to-assume: "arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.AWS_ROLE_UPDATE_LAMBDA_BUILD_AGENT_RUST }}"
           role-session-name: "build-agent-${{ github.run_id }}"
           retry-max-attempts: 3
           mask-aws-account-id: true
