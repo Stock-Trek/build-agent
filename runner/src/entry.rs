@@ -8,7 +8,9 @@ const EXPECTED_ARG_COUNT: i32 = 5;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn entry(argc: i32, argv: *const *const c_char) -> i32 {
     if argc != EXPECTED_ARG_COUNT {
-        eprintln!("Usage: program <context_path> <algorithm_name>");
+        eprintln!(
+            "Usage: program <command> <strategy_name> <strategy_context_path> <portfolio_path>"
+        );
         return SERVER_ENTRY_INCORRECT_ARG_COUNT;
     }
     let args: Vec<String> = (0..argc)
@@ -20,6 +22,7 @@ pub unsafe extern "C" fn entry(argc: i32, argv: *const *const c_char) -> i32 {
     let command = match args[1].as_str() {
         "Algorithm" => Command::Algorithm,
         "Execute" => Command::Execute,
+        "Metadata" => Command::Metadata,
         "Preferences" => Command::Preferences,
         "Signals" => Command::Signals,
         _ => return SERVER_ENTRY_FAILED_TO_PARSE_COMMAND,

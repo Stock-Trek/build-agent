@@ -3,6 +3,9 @@ name = "runner"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 chrono.workspace = true
 prost.workspace = true
