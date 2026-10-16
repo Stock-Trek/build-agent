@@ -152,6 +152,7 @@ name = "build-agent"
 version = "0.1.1"
 dependencies = [
  "axum",
+ "build-exit-codes",
  "reqwest",
  "serde_json",
  "thiserror",
@@ -159,6 +160,10 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
 ]
+
+[[package]]
+name = "build-exit-codes"
+version = "0.1.1"
 
 [[package]]
 name = "bumpalo"
@@ -1478,6 +1483,7 @@ dependencies = [
 name = "runner"
 version = "0.1.1"
 dependencies = [
+ "build-exit-codes",
  "chrono",
  "prost",
  "rust_decimal",

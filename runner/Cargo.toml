@@ -7,6 +7,7 @@ edition.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+build-exit-codes = { path = "../crates/exit_codes" }
 chrono.workspace = true
 prost.workspace = true
 rust_decimal.workspace = true

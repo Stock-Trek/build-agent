@@ -3,14 +3,7 @@ use crate::{
     error::{BaError, BaResult},
 };
 use axum::{body::Bytes, http::StatusCode};
-use std::{
-    process::Stdio,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
-};
+use std::{process::Stdio, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::Command,
@@ -18,12 +11,6 @@ use tokio::{
 };
 
 const BUILD_RUNNER: &str = "/usr/local/bin/build-runner";
-
-// `build-runner` prefixes the stderr lines it emits when it rejects a request
-// as malformed. Because Unix truncates process exit codes to 8 bits, the runner
-// signals the failure class with this marker instead of relying on its (much
-// larger) exit-code constants.
-const BAD_REQUEST_MARKER: &str = "build-runner: invalid request:";
 
 #[derive(Clone)]
 pub struct Handler {
@@ -104,19 +91,12 @@ impl Handler {
             }
         });
 
-        let rejected = Arc::new(AtomicBool::new(false));
-        let stderr_task = {
-            let rejected = Arc::clone(&rejected);
-            tokio::spawn(async move {
-                let mut lines = BufReader::new(stderr).lines();
-                while let Ok(Some(line)) = lines.next_line().await {
-                    if line.starts_with(BAD_REQUEST_MARKER) {
-                        rejected.store(true, Ordering::Relaxed);
-                    }
-                    eprintln!("{line}");
-                }
-            })
-        };
+        let stderr_task = tokio::spawn(async move {
+            let mut lines = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                eprintln!("{line}");
+            }
+        });
 
         let status = child.wait().await.map_err(BaError::WaitForRunner)?;
 
@@ -124,11 +104,16 @@ impl Handler {
         let _ = stderr_task.await;
 
         if !status.success() {
-            return Err(if rejected.load(Ordering::Relaxed) {
-                BaError::InvalidRequest
-            } else {
-                BaError::RunnerFailed(status)
-            });
+            return Err(
+                if status
+                    .code()
+                    .is_some_and(build_exit_codes::is_invalid_request)
+                {
+                    BaError::InvalidRequest
+                } else {
+                    BaError::RunnerFailed(status)
+                },
+            );
         }
 
         Ok(())
