@@ -14,19 +14,14 @@ const USER_GENERATED_DIR: &str = "runner/src/user_generated";
 const CARGO: &str = "cargo";
 const WASMTIME: &str = "wasmtime";
 
+#[derive(Clone)]
 pub struct Artifacts {
     signed_post: SignedPost,
 }
 
 impl Artifacts {
-    pub fn from_env() -> BaResult<Option<Self>> {
-        match SignedPost::from_env()? {
-            Some(signed_post) => Ok(Some(Self { signed_post })),
-            None => {
-                info!("no signed post configured, skipping artifact upload");
-                Ok(None)
-            }
-        }
+    pub fn new(signed_post: SignedPost) -> Self {
+        Self { signed_post }
     }
 
     pub async fn compile() -> BaResult<PathBuf> {

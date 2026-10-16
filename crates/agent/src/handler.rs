@@ -28,11 +28,15 @@ const BAD_REQUEST_MARKER: &str = "build-runner: invalid request:";
 #[derive(Clone)]
 pub struct Handler {
     build_timeout: Duration,
+    artifacts: Option<Artifacts>,
 }
 
 impl Handler {
-    pub fn new(build_timeout: Duration) -> Self {
-        Self { build_timeout }
+    pub fn new(build_timeout: Duration, artifacts: Option<Artifacts>) -> Self {
+        Self {
+            build_timeout,
+            artifacts,
+        }
     }
 
     pub async fn handle(&self, body: Bytes) -> (StatusCode, &'static str) {
@@ -55,7 +59,7 @@ impl Handler {
     }
 
     async fn publish_artifacts(&self) -> BaResult<()> {
-        match Artifacts::from_env()? {
+        match &self.artifacts {
             Some(artifacts) => {
                 let cwasm = Artifacts::compile().await?;
                 artifacts.publish(&cwasm).await
