@@ -1,5 +1,5 @@
 use axum::http::StatusCode;
-use std::process::ExitStatus;
+use std::{process::ExitStatus, time::Duration};
 
 pub type BaResult<T> = Result<T, BaError>;
 
@@ -42,12 +42,16 @@ pub enum BaError {
 
     #[error("build runner exited with {0}")]
     RunnerFailed(ExitStatus),
+
+    #[error("build timed out after {0:?}")]
+    Timeout(Duration),
 }
 
 impl BaError {
     pub fn status(&self) -> StatusCode {
         match self {
             BaError::InvalidRequest => StatusCode::BAD_REQUEST,
+            BaError::Timeout(_) => StatusCode::GATEWAY_TIMEOUT,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -55,6 +59,7 @@ impl BaError {
     pub fn message(&self) -> &'static str {
         match self {
             BaError::InvalidRequest => "invalid request",
+            BaError::Timeout(_) => "build timed out",
             _ => "build failed",
         }
     }
