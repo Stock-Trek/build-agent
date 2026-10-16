@@ -75,17 +75,21 @@ impl Drop for TempFile {
 }
 
 fn main() {
+    std::process::exit(run());
+}
+
+fn run() -> i32 {
     let mut body = String::new();
     if let Err(error) = io::stdin().read_to_string(&mut body) {
         eprintln!("build-runner: failed to read stdin: {error}");
-        std::process::exit(1);
+        return 1;
     }
 
     let request = match parse_request(&body) {
         Ok(request) => request,
         Err(error) => {
             eprintln!("build-runner: invalid request: {error}");
-            std::process::exit(SERVER_ENTRY_FAILED_TO_PARSE_REQUEST);
+            return SERVER_ENTRY_FAILED_TO_PARSE_REQUEST;
         }
     };
 
@@ -96,7 +100,7 @@ fn main() {
                 "build-runner: invalid request: unknown command '{}'",
                 request.command
             );
-            std::process::exit(SERVER_ENTRY_FAILED_TO_PARSE_COMMAND);
+            return SERVER_ENTRY_FAILED_TO_PARSE_COMMAND;
         }
     };
 
@@ -107,7 +111,7 @@ fn main() {
         Ok(file) => file,
         Err(error) => {
             eprintln!("build-runner: failed to load strategy context: {error}");
-            std::process::exit(1);
+            return 1;
         }
     };
     let portfolio = match materialize(
@@ -117,7 +121,7 @@ fn main() {
         Ok(file) => file,
         Err(error) => {
             eprintln!("build-runner: failed to load portfolio: {error}");
-            std::process::exit(1);
+            return 1;
         }
     };
 
@@ -134,14 +138,13 @@ fn main() {
             .unwrap_or_default(),
     };
 
-    let exit_code = match invoke(&args) {
+    match invoke(&args) {
         Ok(exit_code) => exit_code,
         Err(error) => {
             eprintln!("build-runner: invalid argument: {error}");
             SERVER_ENTRY_INVALID_ARGUMENT
         }
-    };
-    std::process::exit(exit_code);
+    }
 }
 
 fn parse_request(body: &str) -> Result<RunRequest, String> {

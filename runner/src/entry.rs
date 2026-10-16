@@ -36,5 +36,5 @@ pub unsafe extern "C" fn entry(argc: i32, argv: *const *const c_char) -> i32 {
         strategy_context_path,
         portfolio_path,
     };
-    run(args)
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(args))).unwrap_or(BOT_ERROR_PANIC)
 }
