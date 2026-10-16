@@ -3,15 +3,7 @@ use crate::convert::{
     market_rolling_window::MarketCandleMap, market_tick::MarketTickVec, required::IsRequired,
     string::from_string,
 };
-use crate::generated::dto::{
-    ActivationDto, AssetCountDto, AssetIdDto, AssetMarketsDto, CexAccountPortfolioDto,
-    CexAccountsDto, DecimalDto, ImmediateActivationDto, LimitOrderRequestDto,
-    MarketBuyOrderRequestDto, MarketByBaseDto, MarketByQuoteDto, MarketCandleDto, MarketCandlesDto,
-    MarketDto, MarketOhlcvDto, MarketOrderBookDto, MarketQuoteDto, MarketSellOrderRequestDto,
-    MarketTickDto, MarketTicksDto, OrderRequestDto, PendingOrderDto, PendingOrdersDto,
-    PortfolioDto, PriceTriggeredActivationDto, QuantityDto, StrategyContextDto,
-    TrailingActivationDto, activation_dto, order_request_dto, quantity_dto,
-};
+use crate::generated::dto::*;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use stock_trek::{
