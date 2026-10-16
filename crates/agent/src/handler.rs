@@ -1,4 +1,7 @@
-use crate::error::{BaError, BaResult};
+use crate::{
+    artifacts::Artifacts,
+    error::{BaError, BaResult},
+};
 use axum::{body::Bytes, http::StatusCode};
 use std::{
     process::Stdio,
@@ -37,11 +40,24 @@ impl Handler {
             .await
             .unwrap_or(Err(BaError::Timeout(self.build_timeout)));
         match result {
-            Ok(()) => (StatusCode::OK, "accepted"),
+            Ok(()) => match self.publish_artifacts().await {
+                Ok(()) => (StatusCode::OK, "accepted"),
+                Err(error) => {
+                    eprintln!("artifact upload failed: {error}");
+                    (error.status(), error.message())
+                }
+            },
             Err(error) => {
                 eprintln!("build failed: {error}");
                 (error.status(), error.message())
             }
+        }
+    }
+
+    async fn publish_artifacts(&self) -> BaResult<()> {
+        match Artifacts::from_env()? {
+            Some(artifacts) => artifacts.publish().await,
+            None => Ok(()),
         }
     }
 

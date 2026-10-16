@@ -1,4 +1,5 @@
 use crate::{
+    artifacts::Artifacts,
     env_var_config::EnvVarConfig,
     error::{BaError, BaResult},
     handler::Handler,
@@ -9,9 +10,11 @@ use axum::{
     routing::{get, post},
 };
 
+mod artifacts;
 mod env_var_config;
 mod error;
 mod handler;
+mod s3;
 mod tracing_setup;
 
 const RUN_PATH: &str = "/run";
@@ -21,6 +24,9 @@ const HEALTH_PATH: &str = "/health";
 async fn main() -> BaResult<()> {
     let config = EnvVarConfig::from_env()?;
     TracingSetup::setup(config.log_filter())?;
+    if let Some(artifacts) = Artifacts::from_env()? {
+        artifacts.publish().await?;
+    }
     let handler = Handler::new(config.build_timeout());
     let app = Router::new().route(HEALTH_PATH, get(health)).route(
         RUN_PATH,
