@@ -16,19 +16,9 @@ use stock_trek::{
 static ALGORITHM_REGISTRY: () = ();
 
 pub fn run(args: Args) -> i32 {
-    let registered_algorithm_opt = ALGORITHM_REGISTRY
-        .iter()
-        .find(|registration| registration.name() == args.strategy_name);
-    let registered_algorithm = match registered_algorithm_opt {
-        Some(algorithm) => algorithm,
-        None => return STRATEGY_NOT_FOUND,
-    };
-    if !registered_algorithm.has_constructor() {
-        return STRATEGY_HAS_NO_CONSTRUCTOR;
-    };
-    let algorithm = match registered_algorithm.instanciate() {
-        Some(algorithm) => algorithm,
-        None => return STRATEGY_COULD_NOT_INSTANTIATE,
+    let algorithm = match select_algorithm(&args.strategy_name) {
+        Ok(algorithm) => algorithm,
+        Err(code) => return code,
     };
     match args.command {
         Command::Algorithm => cmd_algorithm(algorithm.as_ref()),
@@ -41,6 +31,31 @@ pub fn run(args: Args) -> i32 {
         Command::Preferences => cmd_preferences(algorithm.as_ref()),
         Command::Signals => cmd_signals(algorithm.as_ref(), &args.strategy_context_path),
     }
+}
+
+fn select_algorithm(strategy_name: &str) -> Result<Box<dyn Algorithm>, i32> {
+    let mut has_constructorless_registration = false;
+    let mut has_instantiable_registration = false;
+    let mut failed_to_instantiate = false;
+    for registration in ALGORITHM_REGISTRY.iter() {
+        if !registration.has_constructor() {
+            has_constructorless_registration = true;
+            continue;
+        }
+        has_instantiable_registration = true;
+        match registration.instanciate() {
+            Some(algorithm) if algorithm.name() == strategy_name => return Ok(algorithm),
+            Some(_) => {}
+            None => failed_to_instantiate = true,
+        }
+    }
+    if failed_to_instantiate {
+        return Err(STRATEGY_COULD_NOT_INSTANTIATE);
+    }
+    if !has_instantiable_registration && has_constructorless_registration {
+        return Err(STRATEGY_HAS_NO_CONSTRUCTOR);
+    }
+    Err(STRATEGY_NOT_FOUND)
 }
 
 fn cmd_algorithm(algorithm: &dyn Algorithm) -> i32 {
