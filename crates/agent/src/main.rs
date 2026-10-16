@@ -7,6 +7,7 @@ use axum::{
     Router,
     routing::{get, post},
 };
+use std::time::Duration;
 
 mod error;
 mod handler;
@@ -16,13 +17,20 @@ const RUN_PATH: &str = "/run";
 const HEALTH_PATH: &str = "/health";
 const DEFAULT_ADDRESS: &str = "0.0.0.0:8080";
 const ADDRESS_ENV: &str = "BUILD_AGENT_ADDRESS";
+const DEFAULT_BUILD_TIMEOUT_SECS: u64 = 300;
+const BUILD_TIMEOUT_ENV: &str = "BUILD_AGENT_TIMEOUT_SECS";
 
 #[tokio::main]
 async fn main() -> BaResult<()> {
     TracingSetup::setup()?;
-    let app = Router::new()
-        .route(HEALTH_PATH, get(health))
-        .route(RUN_PATH, post(|body| Handler.handle(body)));
+    let handler = Handler::new(build_timeout()?);
+    let app = Router::new().route(HEALTH_PATH, get(health)).route(
+        RUN_PATH,
+        post(move |body| {
+            let handler = handler.clone();
+            async move { handler.handle(body).await }
+        }),
+    );
     let address = std::env::var(ADDRESS_ENV).unwrap_or_else(|_| DEFAULT_ADDRESS.to_string());
     let listener = tokio::net::TcpListener::bind(&address)
         .await
@@ -40,6 +48,19 @@ async fn main() -> BaResult<()> {
 
 async fn health() -> &'static str {
     "ok"
+}
+
+fn build_timeout() -> BaResult<Duration> {
+    match std::env::var(BUILD_TIMEOUT_ENV) {
+        Ok(value) => value
+            .parse::<u64>()
+            .map(Duration::from_secs)
+            .map_err(|error| BaError::Config(format!("{BUILD_TIMEOUT_ENV} is invalid: {error}"))),
+        Err(std::env::VarError::NotPresent) => Ok(Duration::from_secs(DEFAULT_BUILD_TIMEOUT_SECS)),
+        Err(std::env::VarError::NotUnicode(_)) => Err(BaError::Config(format!(
+            "{BUILD_TIMEOUT_ENV} is not valid UTF-8"
+        ))),
+    }
 }
 
 async fn shutdown_signal() {

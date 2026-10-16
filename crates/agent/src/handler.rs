@@ -6,10 +6,12 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
+    time::Duration,
 };
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::Command,
+    time::timeout,
 };
 
 const BUILD_RUNNER: &str = "/usr/local/bin/build-runner";
@@ -21,11 +23,20 @@ const BUILD_RUNNER: &str = "/usr/local/bin/build-runner";
 const BAD_REQUEST_MARKER: &str = "build-runner: invalid request:";
 
 #[derive(Clone)]
-pub struct Handler;
+pub struct Handler {
+    build_timeout: Duration,
+}
 
 impl Handler {
+    pub fn new(build_timeout: Duration) -> Self {
+        Self { build_timeout }
+    }
+
     pub async fn handle(&self, body: Bytes) -> (StatusCode, &'static str) {
-        match self.run_build(body).await {
+        let result = timeout(self.build_timeout, self.run_build(body))
+            .await
+            .unwrap_or(Err(BaError::Timeout(self.build_timeout)));
+        match result {
             Ok(()) => (StatusCode::OK, "accepted"),
             Err(error) => {
                 eprintln!("build failed: {error}");
@@ -41,6 +52,7 @@ impl Handler {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
+            .kill_on_drop(true)
             .spawn()
             .map_err(|source| BaError::SpawnRunner {
                 command: BUILD_RUNNER,
