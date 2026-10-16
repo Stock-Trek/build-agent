@@ -24,7 +24,10 @@
 //! ```
 
 use runner::{
-    args::Args, command::Command, entry::entry, exit_codes::SERVER_ENTRY_FAILED_TO_PARSE_COMMAND,
+    args::Args,
+    command::Command,
+    entry::entry,
+    exit_codes::{SERVER_ENTRY_FAILED_TO_PARSE_COMMAND, SERVER_ENTRY_FAILED_TO_PARSE_REQUEST},
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -39,9 +42,10 @@ use std::{
 const DEFAULT_STRATEGY: &str = "AlgorithmStub";
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(rename_all = "camelCase")]
 struct RunRequest {
-    command: Option<String>,
+    /// Command to invoke, e.g. `Algorithm` or `Execute`.
+    command: String,
     strategy_name: Option<String>,
     /// Base64 encoded `StrategyContextDto` protobuf.
     strategy_context: Option<String>,
@@ -54,10 +58,6 @@ struct RunRequest {
 }
 
 impl RunRequest {
-    fn command(&self) -> &str {
-        self.command.as_deref().unwrap_or("Algorithm")
-    }
-
     fn strategy_name(&self) -> &str {
         match self.strategy_name.as_deref() {
             Some(name) if !name.is_empty() => name,
@@ -84,12 +84,21 @@ fn main() {
         std::process::exit(1);
     }
 
-    let request = parse_request(&body);
+    let request = match parse_request(&body) {
+        Ok(request) => request,
+        Err(error) => {
+            eprintln!("build-runner: invalid request: {error}");
+            std::process::exit(SERVER_ENTRY_FAILED_TO_PARSE_REQUEST);
+        }
+    };
 
-    let command = match parse_command(request.command()) {
+    let command = match parse_command(&request.command) {
         Some(command) => command,
         None => {
-            eprintln!("build-runner: unknown command '{}'", request.command());
+            eprintln!(
+                "build-runner: invalid request: unknown command '{}'",
+                request.command
+            );
             std::process::exit(SERVER_ENTRY_FAILED_TO_PARSE_COMMAND);
         }
     };
@@ -135,26 +144,52 @@ fn main() {
 /// Parse the request body into a [`RunRequest`].
 ///
 /// A JSON object is used directly. A JSON string either holds another JSON
-/// document or a bare command name. Unparseable bodies fall back to the default
-/// `Algorithm` invocation.
-fn parse_request(body: &str) -> RunRequest {
-    match serde_json::from_str::<Value>(body) {
-        Ok(value) => parse_payload(value),
-        Err(_) => RunRequest::default(),
+/// document or a bare command name. Malformed bodies are rejected rather than
+/// falling back to the default `Algorithm` invocation, so a typo cannot
+/// silently succeed.
+fn parse_request(body: &str) -> Result<RunRequest, String> {
+    if body.trim().is_empty() {
+        return Err("body is empty".to_string());
+    }
+    let value: Value =
+        serde_json::from_str(body).map_err(|error| format!("body is not valid JSON: {error}"))?;
+    parse_payload(value)
+}
+
+fn parse_payload(value: Value) -> Result<RunRequest, String> {
+    match value {
+        // The payload may be a JSON document encoded as a string.
+        Value::String(text) => {
+            let text = text.trim();
+            if text.is_empty() {
+                return Err("body is empty".to_string());
+            }
+            match serde_json::from_str::<Value>(text) {
+                Ok(inner) if !matches!(inner, Value::String(_)) => parse_payload(inner),
+                _ => Ok(RunRequest {
+                    command: text.to_string(),
+                    ..RunRequest::default()
+                }),
+            }
+        }
+        Value::Object(_) => serde_json::from_value(value)
+            .map_err(|error| format!("body is not a valid run request: {error}")),
+        other => Err(format!(
+            "body must be a JSON object or command string, got {}",
+            value_kind(&other)
+        )),
     }
 }
 
-fn parse_payload(value: Value) -> RunRequest {
+/// A human-readable description of a JSON value's type.
+fn value_kind(value: &Value) -> &'static str {
     match value {
-        // The payload may be a JSON document encoded as a string.
-        Value::String(text) => match serde_json::from_str::<Value>(&text) {
-            Ok(inner) if !matches!(inner, Value::String(_)) => parse_payload(inner),
-            _ => RunRequest {
-                command: Some(text),
-                ..RunRequest::default()
-            },
-        },
-        value => serde_json::from_value(value).unwrap_or_default(),
+        Value::Null => "null",
+        Value::Bool(_) => "a boolean",
+        Value::Number(_) => "a number",
+        Value::String(_) => "a string",
+        Value::Array(_) => "an array",
+        Value::Object(_) => "an object",
     }
 }
 
@@ -350,20 +385,38 @@ mod tests {
 
     #[test]
     fn parses_direct_request() {
-        let request = parse_request(r#"{"command":"Preferences"}"#);
-        assert_eq!(request.command(), "Preferences");
+        let request = parse_request(r#"{"command":"Preferences"}"#).unwrap();
+        assert_eq!(request.command, "Preferences");
     }
 
     #[test]
     fn parses_bare_command() {
-        let request = parse_request(r#""Execute""#);
-        assert_eq!(request.command(), "Execute");
+        let request = parse_request(r#""Execute""#).unwrap();
+        assert_eq!(request.command, "Execute");
     }
 
     #[test]
-    fn defaults_to_algorithm() {
-        let request = parse_request("not json");
-        assert_eq!(request.command(), "Algorithm");
+    fn defaults_strategy_name() {
+        let request = parse_request(r#"{"command":"Algorithm"}"#).unwrap();
         assert_eq!(request.strategy_name(), "AlgorithmStub");
+    }
+
+    #[test]
+    fn rejects_malformed_requests() {
+        for body in [
+            "",
+            "   ",
+            "not json",
+            "42",
+            "[1, 2]",
+            "null",
+            r#"{"command":123}"#,
+            "{}",
+        ] {
+            assert!(
+                parse_request(body).is_err(),
+                "expected {body:?} to be rejected"
+            );
+        }
     }
 }
