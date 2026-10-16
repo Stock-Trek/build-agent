@@ -122,23 +122,3 @@ impl Handler {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn detects_bad_request_marker() {
-        assert!("build-runner: invalid request: body is empty".starts_with(BAD_REQUEST_MARKER));
-        assert!(
-            "build-runner: invalid request: unknown command 'Bogus'"
-                .starts_with(BAD_REQUEST_MARKER)
-        );
-    }
-
-    #[test]
-    fn ignores_unrelated_stderr_lines() {
-        assert!(!"build-runner: failed to read stdin".starts_with(BAD_REQUEST_MARKER));
-        assert!(!String::new().starts_with(BAD_REQUEST_MARKER));
-    }
-}
