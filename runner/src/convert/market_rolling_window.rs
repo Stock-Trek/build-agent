@@ -13,12 +13,13 @@ impl TryFrom<MarketCandleMap> for MarketRollingWindow {
     fn try_from(value: MarketCandleMap) -> Result<Self, Self::Error> {
         let mut candles = HashMap::new();
         for (window_u32, candle_dto) in value.0 {
-            let window = RollingWindow::from_repr(window_u32 as u8).ok_or(
-                StockTrekError::Value(ValueError::IncorrectType {
+            let window = u8::try_from(window_u32)
+                .ok()
+                .and_then(RollingWindow::from_repr)
+                .ok_or(StockTrekError::Value(ValueError::IncorrectType {
                     expected: "RollingWindow".to_string(),
                     found: window_u32.to_string(),
-                }),
-            )?;
+                }))?;
             let candle = candle_dto.try_into()?;
             candles.insert(window, candle);
         }

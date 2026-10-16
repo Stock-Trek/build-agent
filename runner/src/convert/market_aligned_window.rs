@@ -13,12 +13,13 @@ impl TryFrom<MarketCandlesMap> for MarketAlignedWindow {
     fn try_from(value: MarketCandlesMap) -> Result<Self, Self::Error> {
         let mut candles = HashMap::new();
         for (window_u32, candles_dto) in value.0 {
-            let window = AlignedWindow::from_repr(window_u32 as u8).ok_or(
-                StockTrekError::Value(ValueError::IncorrectType {
+            let window = u8::try_from(window_u32)
+                .ok()
+                .and_then(AlignedWindow::from_repr)
+                .ok_or(StockTrekError::Value(ValueError::IncorrectType {
                     expected: "AlignedWindow".to_string(),
                     found: window_u32.to_string(),
-                }),
-            )?;
+                }))?;
             let window_candles = candles_dto
                 .candles_dto
                 .into_iter()
