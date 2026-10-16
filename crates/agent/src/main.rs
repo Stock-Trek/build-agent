@@ -1,4 +1,8 @@
-use crate::{handler::Handler, tracing_setup::TracingSetup};
+use crate::{
+    error::{BaError, BaResult},
+    handler::Handler,
+    tracing_setup::TracingSetup,
+};
 use axum::{
     Router,
     routing::{get, post},
@@ -14,7 +18,7 @@ const DEFAULT_ADDRESS: &str = "0.0.0.0:8080";
 const ADDRESS_ENV: &str = "BUILD_AGENT_ADDRESS";
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() -> BaResult<()> {
     TracingSetup::setup()?;
     let app = Router::new()
         .route(HEALTH_PATH, get(health))
@@ -22,12 +26,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let address = std::env::var(ADDRESS_ENV).unwrap_or_else(|_| DEFAULT_ADDRESS.to_string());
     let listener = tokio::net::TcpListener::bind(&address)
         .await
-        .unwrap_or_else(|error| panic!("failed to bind {address}: {error}"));
+        .map_err(|source| BaError::Bind {
+            address: address.clone(),
+            source,
+        })?;
     println!("build agent listening on {address}");
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .expect("server error");
+        .map_err(BaError::Serve)?;
     Ok(())
 }
 
