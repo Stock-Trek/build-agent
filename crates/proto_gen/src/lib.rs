@@ -16,11 +16,9 @@ pub fn generate(proto_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::err
     protos.sort();
 
     let protoc = protoc_bin_vendored::protoc_bin_path()?;
-    unsafe {
-        std::env::set_var("PROTOC", protoc);
-    }
 
     prost_build::Config::new()
+        .protoc_executable(protoc)
         .out_dir(out_dir)
         .compile_protos(&protos, &[proto_dir])?;
 
@@ -35,4 +33,32 @@ pub fn generate(proto_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::err
     let contents = "pub mod dto;\n";
     std::fs::write(mod_path, contents)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checked_in_sources_match_proto_files() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .expect("proto-gen lives under the workspace root");
+        let out_dir = std::env::temp_dir().join(format!("proto-gen-test-{}", std::process::id()));
+        generate(&root.join("proto"), &out_dir).expect("failed to generate DTOs");
+
+        for name in ["dto.rs", "mod.rs"] {
+            let expected = std::fs::read_to_string(root.join("runner/src/generated").join(name))
+                .unwrap_or_else(|error| panic!("failed to read checked-in {name}: {error}"));
+            let actual = std::fs::read_to_string(out_dir.join(name))
+                .unwrap_or_else(|error| panic!("failed to read generated {name}: {error}"));
+            assert_eq!(
+                expected, actual,
+                "runner/src/generated/{name} is out of date; run `cargo run -p proto-gen`"
+            );
+        }
+
+        std::fs::remove_dir_all(&out_dir).ok();
+    }
 }
