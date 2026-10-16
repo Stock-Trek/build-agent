@@ -11,7 +11,7 @@ impl Default for AlgorithmStub {
 #[register_algorithm(default)]
 impl Algorithm for AlgorithmStub {
     fn name(&self) -> &str {
-        ""
+        "AlgorithmStub"
     }
     fn description(&self) -> &str {
         ""
