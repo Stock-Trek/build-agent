@@ -1,4 +1,7 @@
-use crate::error::{BaError, BaResult};
+use crate::{
+    artifacts::Artifacts,
+    error::{BaError, BaResult},
+};
 use axum::{body::Bytes, http::StatusCode};
 use std::{
     process::Stdio,
@@ -25,11 +28,15 @@ const BAD_REQUEST_MARKER: &str = "build-runner: invalid request:";
 #[derive(Clone)]
 pub struct Handler {
     build_timeout: Duration,
+    artifacts: Option<Artifacts>,
 }
 
 impl Handler {
-    pub fn new(build_timeout: Duration) -> Self {
-        Self { build_timeout }
+    pub fn new(build_timeout: Duration, artifacts: Option<Artifacts>) -> Self {
+        Self {
+            build_timeout,
+            artifacts,
+        }
     }
 
     pub async fn handle(&self, body: Bytes) -> (StatusCode, &'static str) {
@@ -37,11 +44,27 @@ impl Handler {
             .await
             .unwrap_or(Err(BaError::Timeout(self.build_timeout)));
         match result {
-            Ok(()) => (StatusCode::OK, "accepted"),
+            Ok(()) => match self.publish_artifacts().await {
+                Ok(()) => (StatusCode::OK, "accepted"),
+                Err(error) => {
+                    eprintln!("artifact upload failed: {error}");
+                    (error.status(), error.message())
+                }
+            },
             Err(error) => {
                 eprintln!("build failed: {error}");
                 (error.status(), error.message())
             }
+        }
+    }
+
+    async fn publish_artifacts(&self) -> BaResult<()> {
+        match &self.artifacts {
+            Some(artifacts) => {
+                let cwasm = Artifacts::compile().await?;
+                artifacts.publish(&cwasm).await
+            }
+            None => Ok(()),
         }
     }
 

@@ -1,0 +1,101 @@
+//! Upload build artifacts to S3 using a pre-signed POST policy.
+//!
+//! `ref-sync` starts a build agent with a short-lived pre-signed POST so the
+//! agent can write its artifacts without any long-lived AWS credentials. The
+//! url and form fields are provided through the `SIGNED_POST_URL` and
+//! `SIGNED_POST_FIELDS` environment variables. `SIGNED_POST_FIELDS` is a JSON
+//! object holding the policy fields that must be sent alongside the file (for
+//! example `key`, `policy`, `x-amz-signature`, ...).
+//!
+//! A single pre-signed POST can upload more than one artifact when the `key`
+//! field contains the `${filename}` variable, which S3 replaces with the name
+//! of the uploaded file.
+
+use crate::error::{BaError, BaResult};
+use std::{collections::BTreeMap, path::Path};
+use tracing::info;
+
+/// The form field that holds the object body in an S3 pre-signed POST.
+pub const FILE_FIELD: &str = "file";
+
+/// The S3 variable replaced with the uploaded file's name.
+const FILENAME_VARIABLE: &str = "${filename}";
+
+/// A pre-signed POST target for uploading build artifacts.
+#[derive(Debug, Clone)]
+pub struct SignedPost {
+    url: String,
+    fields: BTreeMap<String, String>,
+    client: reqwest::Client,
+}
+
+impl SignedPost {
+    pub fn new(url: String, fields: BTreeMap<String, String>) -> Self {
+        Self {
+            url,
+            fields,
+            client: reqwest::Client::new(),
+        }
+    }
+
+    /// Upload `path` using the configured pre-signed POST.
+    pub async fn upload(&self, path: &Path) -> BaResult<()> {
+        let bytes = tokio::fs::read(path)
+            .await
+            .map_err(|source| BaError::ReadArtifact {
+                path: path.to_path_buf(),
+                source,
+            })?;
+        let file_name = Self::file_name(path)?;
+
+        let file = reqwest::multipart::Part::bytes(bytes)
+            .file_name(file_name.clone())
+            .mime_str("application/octet-stream")
+            .map_err(|source| BaError::BuildUploadRequest {
+                path: path.to_path_buf(),
+                source,
+            })?;
+
+        // S3 requires the file to be the last field in the multipart body.
+        let mut form = reqwest::multipart::Form::new();
+        for (name, value) in &self.fields {
+            form = form.text(name.clone(), Self::field_value(value, &file_name));
+        }
+        form = form.part(FILE_FIELD, file);
+
+        let response = self
+            .client
+            .post(&self.url)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|source| BaError::UploadArtifact {
+                path: path.to_path_buf(),
+                source,
+            })?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(BaError::UploadRejected {
+                path: path.to_path_buf(),
+                status: status.as_u16(),
+                body,
+            });
+        }
+
+        info!(artifact = %path.display(), "uploaded build artifact");
+        Ok(())
+    }
+
+    fn field_value(value: &str, file_name: &str) -> String {
+        value.replace(FILENAME_VARIABLE, file_name)
+    }
+
+    fn file_name(path: &Path) -> BaResult<String> {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .map(str::to_string)
+            .ok_or_else(|| BaError::Config(format!("artifact path {path:?} has no file name")))
+    }
+}

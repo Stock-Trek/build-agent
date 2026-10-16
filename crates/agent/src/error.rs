@@ -1,5 +1,5 @@
 use axum::http::StatusCode;
-use std::{process::ExitStatus, time::Duration};
+use std::{path::PathBuf, process::ExitStatus, time::Duration};
 
 pub type BaResult<T> = Result<T, BaError>;
 
@@ -45,6 +45,51 @@ pub enum BaError {
 
     #[error("build timed out after {0:?}")]
     Timeout(Duration),
+
+    #[error("failed to read artifact {path}")]
+    ReadArtifact {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("failed to read artifact directory {path}")]
+    ReadArtifactDirectory {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("failed to build the upload request for {path}")]
+    BuildUploadRequest {
+        path: PathBuf,
+        #[source]
+        source: reqwest::Error,
+    },
+
+    #[error("failed to upload artifact {path}")]
+    UploadArtifact {
+        path: PathBuf,
+        #[source]
+        source: reqwest::Error,
+    },
+
+    #[error("upload of {path} was rejected with status {status}: {body}")]
+    UploadRejected {
+        path: PathBuf,
+        status: u16,
+        body: String,
+    },
+
+    #[error("failed to compile artifact {path}")]
+    CompileArtifact {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("compilation of artifact {path} exited with {status}")]
+    CompileArtifactFailed { path: PathBuf, status: ExitStatus },
 }
 
 impl BaError {

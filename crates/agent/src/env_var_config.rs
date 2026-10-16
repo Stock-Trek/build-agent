@@ -1,5 +1,10 @@
-use crate::error::{BaError, BaResult};
+use crate::{
+    error::{BaError, BaResult},
+    s3::SignedPost,
+};
+use serde_json::Value;
 use std::{
+    collections::BTreeMap,
     env::{self, VarError},
     time::Duration,
 };
@@ -10,12 +15,15 @@ const DEFAULT_ADDRESS: &str = "0.0.0.0:8080";
 const BUILD_TIMEOUT_ENV: &str = "BUILD_AGENT_TIMEOUT_SECS";
 const DEFAULT_BUILD_TIMEOUT_SECS: u64 = 300;
 const DEFAULT_LOG_FILTER: &str = "info";
+const SIGNED_POST_URL_ENV: &str = "SIGNED_POST_URL";
+const SIGNED_POST_FIELDS_ENV: &str = "SIGNED_POST_FIELDS";
 
 #[derive(Debug)]
 pub struct EnvVarConfig {
     address: String,
     build_timeout: Duration,
     log_filter: EnvFilter,
+    signed_post: Option<SignedPost>,
 }
 
 impl EnvVarConfig {
@@ -24,6 +32,7 @@ impl EnvVarConfig {
             address: Self::address_from_env()?,
             build_timeout: Self::build_timeout_from_env()?,
             log_filter: Self::log_filter_from_env()?,
+            signed_post: Self::signed_post_from_env()?,
         })
     }
 
@@ -37,6 +46,10 @@ impl EnvVarConfig {
 
     pub fn log_filter(&self) -> EnvFilter {
         self.log_filter.clone()
+    }
+
+    pub fn signed_post(&self) -> Option<SignedPost> {
+        self.signed_post.clone()
     }
 
     fn address_from_env() -> BaResult<String> {
@@ -62,6 +75,52 @@ impl EnvVarConfig {
             }),
             None => Ok(EnvFilter::new(DEFAULT_LOG_FILTER)),
         }
+    }
+
+    fn signed_post_from_env() -> BaResult<Option<SignedPost>> {
+        let url = Self::optional(SIGNED_POST_URL_ENV)?.filter(|value| !value.trim().is_empty());
+        let fields =
+            Self::optional(SIGNED_POST_FIELDS_ENV)?.filter(|value| !value.trim().is_empty());
+        match (url, fields) {
+            (None, None) => Ok(None),
+            (Some(_), None) => Err(BaError::Config(format!(
+                "{SIGNED_POST_FIELDS_ENV} must be set when {SIGNED_POST_URL_ENV} is set"
+            ))),
+            (None, Some(_)) => Err(BaError::Config(format!(
+                "{SIGNED_POST_URL_ENV} must be set when {SIGNED_POST_FIELDS_ENV} is set"
+            ))),
+            (Some(url), Some(fields)) => Ok(Some(SignedPost::new(
+                url,
+                Self::parse_signed_post_fields(&fields)?,
+            ))),
+        }
+    }
+
+    fn parse_signed_post_fields(json: &str) -> BaResult<BTreeMap<String, String>> {
+        let value: Value = serde_json::from_str(json).map_err(|source| {
+            BaError::Config(format!(
+                "{SIGNED_POST_FIELDS_ENV} is not valid JSON: {source}"
+            ))
+        })?;
+        let object = value.as_object().ok_or_else(|| {
+            BaError::Config(format!("{SIGNED_POST_FIELDS_ENV} must be a JSON object"))
+        })?;
+
+        let mut fields = BTreeMap::new();
+        for (name, value) in object {
+            let text = match value {
+                Value::String(text) => text.clone(),
+                Value::Number(number) => number.to_string(),
+                Value::Bool(boolean) => boolean.to_string(),
+                _ => {
+                    return Err(BaError::Config(format!(
+                        "{SIGNED_POST_FIELDS_ENV}.{name} must be a string"
+                    )));
+                }
+            };
+            fields.insert(name.clone(), text);
+        }
+        Ok(fields)
     }
 
     fn optional(name: &str) -> BaResult<Option<String>> {
