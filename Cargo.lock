@@ -152,6 +152,7 @@ name = "build-agent"
 version = "0.1.1"
 dependencies = [
  "axum",
+ "exit-codes",
  "reqwest",
  "serde_json",
  "thiserror",
@@ -346,6 +347,10 @@ dependencies = [
  "libc",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "exit-codes"
+version = "0.1.1"
 
 [[package]]
 name = "fastrand"
@@ -1479,6 +1484,7 @@ name = "runner"
 version = "0.1.1"
 dependencies = [
  "chrono",
+ "exit-codes",
  "prost",
  "rust_decimal",
  "serde",
