@@ -1,4 +1,4 @@
 [package]
-name = "build-exit-codes"
+name = "exit-codes"
 version.workspace = true
 edition.workspace = true

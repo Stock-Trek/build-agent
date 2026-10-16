@@ -105,10 +105,7 @@ impl Handler {
 
         if !status.success() {
             return Err(
-                if status
-                    .code()
-                    .is_some_and(build_exit_codes::is_invalid_request)
-                {
+                if status.code().is_some_and(exit_codes::is_invalid_request) {
                     BaError::InvalidRequest
                 } else {
                     BaError::RunnerFailed(status)
