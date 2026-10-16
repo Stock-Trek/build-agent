@@ -56,7 +56,10 @@ impl Handler {
 
     async fn publish_artifacts(&self) -> BaResult<()> {
         match Artifacts::from_env()? {
-            Some(artifacts) => artifacts.publish().await,
+            Some(artifacts) => {
+                let cwasm = Artifacts::compile().await?;
+                artifacts.publish(&cwasm).await
+            }
             None => Ok(()),
         }
     }

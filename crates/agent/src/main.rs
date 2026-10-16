@@ -25,7 +25,8 @@ async fn main() -> BaResult<()> {
     let config = EnvVarConfig::from_env()?;
     TracingSetup::setup(config.log_filter())?;
     if let Some(artifacts) = Artifacts::from_env()? {
-        artifacts.publish().await?;
+        let cwasm = Artifacts::compile().await?;
+        artifacts.publish(&cwasm).await?;
     }
     let handler = Handler::new(config.build_timeout());
     let app = Router::new().route(HEALTH_PATH, get(health)).route(

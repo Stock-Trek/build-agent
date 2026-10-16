@@ -6,9 +6,12 @@ use std::path::{Path, PathBuf};
 use tokio::{fs, process::Command};
 use tracing::info;
 
+const WASM_MANIFEST: &str = "runner/Cargo.toml";
+const WASM_TARGET: &str = "wasm32-wasip1";
 const WASM_ARTIFACT: &str = "/app/target/wasm32-wasip1/release/runner.wasm";
 const CWASM_ARTIFACT: &str = "/tmp/runner.cwasm";
 const USER_GENERATED_DIR: &str = "runner/src/user_generated";
+const CARGO: &str = "cargo";
 const WASMTIME: &str = "wasmtime";
 
 pub struct Artifacts {
@@ -26,17 +29,43 @@ impl Artifacts {
         }
     }
 
-    pub async fn publish(&self) -> BaResult<()> {
-        let cwasm = Self::compile().await?;
-        self.signed_post.upload(&cwasm).await?;
-        for source in Self::user_generated_files().await? {
-            self.signed_post.upload(&source).await?;
+    pub async fn compile() -> BaResult<PathBuf> {
+        Self::build_wasm().await?;
+        Self::compile_wasm().await
+    }
+
+    async fn build_wasm() -> BaResult<()> {
+        let module = PathBuf::from(WASM_ARTIFACT);
+        let status = Command::new(CARGO)
+            .arg("build")
+            .arg("--manifest-path")
+            .arg(WASM_MANIFEST)
+            .arg("--target")
+            .arg(WASM_TARGET)
+            .arg("--release")
+            .arg("--lib")
+            .status()
+            .await
+            .map_err(|source| BaError::CompileArtifact {
+                path: module.clone(),
+                source,
+            })?;
+
+        if !status.success() {
+            return Err(BaError::CompileArtifactFailed {
+                path: module,
+                status,
+            });
         }
-        info!("published build artifacts");
+        info!(
+            manifest = WASM_MANIFEST,
+            target = WASM_TARGET,
+            "built wasm artifact"
+        );
         Ok(())
     }
 
-    async fn compile() -> BaResult<PathBuf> {
+    async fn compile_wasm() -> BaResult<PathBuf> {
         let module = Path::new(WASM_ARTIFACT);
         let output = PathBuf::from(CWASM_ARTIFACT);
         let status = Command::new(WASMTIME)
@@ -61,6 +90,15 @@ impl Artifacts {
         }
         info!(module = %module.display(), output = %output.display(), "compiled wasm artifact");
         Ok(output)
+    }
+
+    pub async fn publish(&self, cwasm: &Path) -> BaResult<()> {
+        self.signed_post.upload(cwasm).await?;
+        for source in Self::user_generated_files().await? {
+            self.signed_post.upload(&source).await?;
+        }
+        info!("published build artifacts");
+        Ok(())
     }
 
     async fn user_generated_files() -> BaResult<Vec<PathBuf>> {
