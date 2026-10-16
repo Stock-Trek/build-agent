@@ -1,6 +1,6 @@
 use crate::{convert::required::IsRequired, generated::dto::DecimalDto};
 use rust_decimal::{Decimal, prelude::ToPrimitive};
-use stock_trek::errors::{StockTrekError, StockTrekResult};
+use stock_trek::errors::{StockTrekError, StockTrekResult, ValueError};
 
 pub trait ToDecimal {
     fn to_decimal(self) -> StockTrekResult<Decimal>;
@@ -8,6 +8,12 @@ pub trait ToDecimal {
 
 impl ToDecimal for DecimalDto {
     fn to_decimal(self) -> StockTrekResult<Decimal> {
+        if self.scale > Decimal::MAX_SCALE {
+            return Err(StockTrekError::Value(ValueError::IncorrectType {
+                expected: format!("scale <= {}", Decimal::MAX_SCALE),
+                found: self.scale.to_string(),
+            }));
+        }
         Ok(Decimal::from_parts(
             self.lo,
             self.mid,
