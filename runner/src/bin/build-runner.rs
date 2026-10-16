@@ -47,16 +47,11 @@ const DEFAULT_STRATEGY: &str = "AlgorithmStub";
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RunRequest {
-    /// Command to invoke, e.g. `Algorithm` or `Execute`.
     command: String,
     strategy_name: Option<String>,
-    /// Base64 encoded `StrategyContextDto` protobuf.
     strategy_context: Option<String>,
-    /// Base64 encoded `PortfolioDto` protobuf.
     portfolio: Option<String>,
-    /// Path to a `StrategyContextDto` protobuf, used instead of `strategyContext`.
     strategy_context_path: Option<String>,
-    /// Path to a `PortfolioDto` protobuf, used instead of `portfolio`.
     portfolio_path: Option<String>,
 }
 
@@ -69,7 +64,6 @@ impl RunRequest {
     }
 }
 
-/// A temporary file that is removed when it goes out of scope.
 struct TempFile {
     path: PathBuf,
 }
@@ -150,12 +144,6 @@ fn main() {
     std::process::exit(exit_code);
 }
 
-/// Parse the request body into a [`RunRequest`].
-///
-/// A JSON object is used directly. A JSON string either holds another JSON
-/// document or a bare command name. Malformed bodies are rejected rather than
-/// falling back to the default `Algorithm` invocation, so a typo cannot
-/// silently succeed.
 fn parse_request(body: &str) -> Result<RunRequest, String> {
     if body.trim().is_empty() {
         return Err("body is empty".to_string());
@@ -167,7 +155,6 @@ fn parse_request(body: &str) -> Result<RunRequest, String> {
 
 fn parse_payload(value: Value) -> Result<RunRequest, String> {
     match value {
-        // The payload may be a JSON document encoded as a string.
         Value::String(text) => {
             let text = text.trim();
             if text.is_empty() {
@@ -190,7 +177,6 @@ fn parse_payload(value: Value) -> Result<RunRequest, String> {
     }
 }
 
-/// A human-readable description of a JSON value's type.
 fn value_kind(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
