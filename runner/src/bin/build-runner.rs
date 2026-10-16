@@ -62,6 +62,37 @@ impl RunRequest {
             _ => DEFAULT_STRATEGY,
         }
     }
+
+    fn validate(&self) -> Result<(), String> {
+        ensure_exclusive(
+            self.strategy_context.as_deref(),
+            self.strategy_context_path.as_deref(),
+            "strategyContext",
+            "strategyContextPath",
+        )?;
+        ensure_exclusive(
+            self.portfolio.as_deref(),
+            self.portfolio_path.as_deref(),
+            "portfolio",
+            "portfolioPath",
+        )
+    }
+}
+
+fn ensure_exclusive(
+    inline: Option<&str>,
+    path: Option<&str>,
+    inline_field: &str,
+    path_field: &str,
+) -> Result<(), String> {
+    let inline_supplied = inline.is_some_and(|value| !value.is_empty());
+    let path_supplied = path.is_some_and(|value| !value.is_empty());
+    if inline_supplied && path_supplied {
+        return Err(format!(
+            "`{inline_field}` and `{path_field}` cannot both be supplied"
+        ));
+    }
+    Ok(())
 }
 
 struct TempFile {
@@ -153,7 +184,9 @@ fn parse_request(body: &str) -> Result<RunRequest, String> {
     }
     let value: Value =
         serde_json::from_str(body).map_err(|error| format!("body is not valid JSON: {error}"))?;
-    parse_payload(value)
+    let request = parse_payload(value)?;
+    request.validate()?;
+    Ok(request)
 }
 
 fn parse_payload(value: Value) -> Result<RunRequest, String> {
@@ -206,11 +239,22 @@ fn parse_command(command: &str) -> Option<Command> {
 /// algorithm reads its protobuf inputs from disk, so both representations are
 /// normalised to a file path. When neither is provided, the input is omitted.
 fn materialize(inline: Option<&str>, path: Option<&str>) -> io::Result<Option<TempFile>> {
-    let bytes = match (inline, path) {
-        (_, Some(path)) if !path.is_empty() => fs::read(path)?,
-        (Some(inline), _) if !inline.is_empty() => decode_base64(inline)
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?,
-        _ => return Ok(None),
+    let inline = inline.filter(|value| !value.is_empty());
+    let path = path.filter(|value| !value.is_empty());
+
+    if inline.is_some() && path.is_some() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "cannot supply both an inline value and a path",
+        ));
+    }
+
+    let bytes = if let Some(inline) = inline {
+        decode_base64(inline).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?
+    } else if let Some(path) = path {
+        fs::read(path)?
+    } else {
+        return Ok(None);
     };
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
