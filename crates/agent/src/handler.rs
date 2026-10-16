@@ -25,9 +25,8 @@ impl Handler {
     }
 
     async fn run_build(&self, body: Bytes) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        // The envelope is JSON: { "microvmId": "...", "runHookPayload": "..." }.
-        // We pass the raw body through to the build runner, which is responsible
-        // for extracting whatever it needs from runHookPayload.
+        // Pass the raw request body through to the build runner, which is
+        // responsible for parsing the algorithm invocation.
         let mut child = Command::new(BUILD_RUNNER)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -42,7 +41,7 @@ impl Handler {
         }
 
         // Stream stdout and stderr line-by-line into our own stdout/stderr so
-        // the MicroVM's log capture picks them up in real time.
+        // the container log driver captures them in real time.
         let stdout = child.stdout.take().expect("child stdout");
         let stderr = child.stderr.take().expect("child stderr");
 
