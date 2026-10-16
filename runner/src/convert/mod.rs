@@ -13,3 +13,6 @@ pub mod portfolio;
 pub mod required;
 pub mod strategy_context;
 pub mod string;
+
+#[cfg(test)]
+mod tests;
