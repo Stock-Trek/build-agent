@@ -27,12 +27,15 @@ use runner::{
     args::Args,
     command::Command,
     entry::entry,
-    exit_codes::{SERVER_ENTRY_FAILED_TO_PARSE_COMMAND, SERVER_ENTRY_FAILED_TO_PARSE_REQUEST},
+    exit_codes::{
+        SERVER_ENTRY_FAILED_TO_PARSE_COMMAND, SERVER_ENTRY_FAILED_TO_PARSE_REQUEST,
+        SERVER_ENTRY_INVALID_ARGUMENT,
+    },
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
-    ffi::CString,
+    ffi::{CString, NulError},
     fs,
     io::{self, Read},
     path::PathBuf,
@@ -137,7 +140,13 @@ fn main() {
             .unwrap_or_default(),
     };
 
-    let exit_code = invoke(&args);
+    let exit_code = match invoke(&args) {
+        Ok(exit_code) => exit_code,
+        Err(error) => {
+            eprintln!("build-runner: invalid argument: {error}");
+            SERVER_ENTRY_INVALID_ARGUMENT
+        }
+    };
     std::process::exit(exit_code);
 }
 
@@ -223,12 +232,12 @@ fn materialize(inline: Option<&str>, path: Option<&str>) -> io::Result<Option<Te
 }
 
 /// Invoke the algorithm entry point with the resolved arguments.
-fn invoke(args: &Args) -> i32 {
-    let program = cstring("build-runner");
-    let command = cstring(command_name(args.command));
-    let strategy_name = cstring(&args.strategy_name);
-    let strategy_context = cstring(&args.strategy_context_path);
-    let portfolio = cstring(&args.portfolio_path);
+fn invoke(args: &Args) -> Result<i32, NulError> {
+    let program = cstring("build-runner")?;
+    let command = cstring(command_name(args.command))?;
+    let strategy_name = cstring(&args.strategy_name)?;
+    let strategy_context = cstring(&args.strategy_context_path)?;
+    let portfolio = cstring(&args.portfolio_path)?;
     let argv = [
         program.as_ptr(),
         command.as_ptr(),
@@ -239,7 +248,7 @@ fn invoke(args: &Args) -> i32 {
 
     // Safety: `argv` holds valid, NUL-terminated C strings for the duration of
     // the call and `argv.len()` matches `EXPECTED_ARG_COUNT`.
-    unsafe { entry(argv.len() as i32, argv.as_ptr()) }
+    Ok(unsafe { entry(argv.len() as i32, argv.as_ptr()) })
 }
 
 fn command_name(command: Command) -> &'static str {
@@ -254,8 +263,8 @@ fn command_name(command: Command) -> &'static str {
     }
 }
 
-fn cstring(value: &str) -> CString {
-    CString::new(value).expect("arguments must not contain interior NUL bytes")
+fn cstring(value: &str) -> Result<CString, NulError> {
+    CString::new(value)
 }
 
 /// Decode standard base64, ignoring padding and whitespace.
