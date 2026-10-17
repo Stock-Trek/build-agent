@@ -1,4 +1,4 @@
-use crate::{args::Args, command::Command, exit_codes::*, runner::run};
+use crate::{command::Command, exit_codes::*, runner::run};
 use std::{ffi::CStr, os::raw::c_char};
 
 const EXPECTED_ARG_COUNT: i32 = 5;
@@ -20,21 +20,26 @@ pub unsafe extern "C" fn entry(argc: i32, argv: *const *const c_char) -> i32 {
         })
         .collect();
     let command = match args[1].as_str() {
-        "Algorithm" => Command::Algorithm,
-        "Execute" => Command::Execute,
-        "Metadata" => Command::Metadata,
-        "Preferences" => Command::Preferences,
-        "Signals" => Command::Signals,
+        "Algorithm" => Command::Algorithm {
+            strategy_name: args[2].clone(),
+        },
+        "Execute" => Command::Execute {
+            strategy_name: args[2].clone(),
+            strategy_context_path: args[3].clone(),
+            portfolio_path: args[4].clone(),
+        },
+        "Metadata" => Command::Metadata {
+            strategy_name: args[2].clone(),
+        },
+        "Preferences" => Command::Preferences {
+            strategy_name: args[2].clone(),
+        },
+        "Signals" => Command::Signals {
+            strategy_name: args[2].clone(),
+            strategy_context_path: args[3].clone(),
+        },
         _ => return SERVER_ENTRY_FAILED_TO_PARSE_COMMAND,
     };
-    let strategy_name = args[2].clone();
-    let strategy_context_path = args[3].clone();
-    let portfolio_path = args[4].clone();
-    let args = Args {
-        command,
-        strategy_name,
-        strategy_context_path,
-        portfolio_path,
-    };
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(args))).unwrap_or(BOT_ERROR_PANIC)
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(command)))
+        .unwrap_or(BOT_ERROR_PANIC)
 }

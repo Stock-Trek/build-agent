@@ -6,10 +6,10 @@
 //!
 //! ```json
 //! {
-//!   "command": "Algorithm",
+//!   "command": "Execute",
 //!   "strategyName": "AlgorithmStub",
-//!   "strategyContext": "<base64 StrategyContextDto>",
-//!   "portfolio": "<base64 PortfolioDto>"
+//!   "strategyContextPath": "/tmp/strategy-context.bin",
+//!   "portfolioPath": "/tmp/portfolio.bin"
 //! }
 //! ```
 //!
@@ -24,55 +24,15 @@
 //! ```
 
 use runner::{
-    args::Args,
     command::Command,
     entry::entry,
-    exit_codes::{
-        SERVER_ENTRY_FAILED_TO_PARSE_COMMAND, SERVER_ENTRY_FAILED_TO_PARSE_REQUEST,
-        SERVER_ENTRY_INVALID_ARGUMENT,
-    },
+    exit_codes::{SERVER_ENTRY_FAILED_TO_PARSE_REQUEST, SERVER_ENTRY_INVALID_ARGUMENT},
 };
-use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
     ffi::{CString, NulError},
-    fs,
     io::{self, Read},
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
 };
-
-const DEFAULT_STRATEGY: &str = "AlgorithmStub";
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RunRequest {
-    command: String,
-    strategy_name: Option<String>,
-    strategy_context: Option<String>,
-    portfolio: Option<String>,
-    strategy_context_path: Option<String>,
-    portfolio_path: Option<String>,
-}
-
-impl RunRequest {
-    fn strategy_name(&self) -> &str {
-        match self.strategy_name.as_deref() {
-            Some(name) if !name.is_empty() => name,
-            _ => DEFAULT_STRATEGY,
-        }
-    }
-}
-
-struct TempFile {
-    path: PathBuf,
-}
-
-impl Drop for TempFile {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.path);
-    }
-}
 
 fn main() {
     std::process::exit(run());
@@ -85,60 +45,15 @@ fn run() -> i32 {
         return 1;
     }
 
-    let request = match parse_request(&body) {
-        Ok(request) => request,
+    let command = match parse_request(&body) {
+        Ok(command) => command,
         Err(error) => {
             eprintln!("build-runner: invalid request: {error}");
             return SERVER_ENTRY_FAILED_TO_PARSE_REQUEST;
         }
     };
 
-    let command = match parse_command(&request.command) {
-        Some(command) => command,
-        None => {
-            eprintln!(
-                "build-runner: invalid request: unknown command '{}'",
-                request.command
-            );
-            return SERVER_ENTRY_FAILED_TO_PARSE_COMMAND;
-        }
-    };
-
-    let strategy_context = match materialize(
-        request.strategy_context.as_deref(),
-        request.strategy_context_path.as_deref(),
-    ) {
-        Ok(file) => file,
-        Err(error) => {
-            eprintln!("build-runner: failed to load strategy context: {error}");
-            return 1;
-        }
-    };
-    let portfolio = match materialize(
-        request.portfolio.as_deref(),
-        request.portfolio_path.as_deref(),
-    ) {
-        Ok(file) => file,
-        Err(error) => {
-            eprintln!("build-runner: failed to load portfolio: {error}");
-            return 1;
-        }
-    };
-
-    let args = Args {
-        command,
-        strategy_name: request.strategy_name().to_string(),
-        strategy_context_path: strategy_context
-            .as_ref()
-            .map(|file| file.path.to_string_lossy().into_owned())
-            .unwrap_or_default(),
-        portfolio_path: portfolio
-            .as_ref()
-            .map(|file| file.path.to_string_lossy().into_owned())
-            .unwrap_or_default(),
-    };
-
-    match invoke(&args) {
+    match invoke(&command) {
         Ok(exit_code) => exit_code,
         Err(error) => {
             eprintln!("build-runner: invalid argument: {error}");
@@ -147,89 +62,25 @@ fn run() -> i32 {
     }
 }
 
-fn parse_request(body: &str) -> Result<RunRequest, String> {
+/// Deserialise the request body into a `Command`.
+fn parse_request(body: &str) -> Result<Command, String> {
     if body.trim().is_empty() {
         return Err("body is empty".to_string());
     }
-    let value: Value =
-        serde_json::from_str(body).map_err(|error| format!("body is not valid JSON: {error}"))?;
-    parse_payload(value)
-}
-
-fn parse_payload(value: Value) -> Result<RunRequest, String> {
-    match value {
-        Value::String(text) => {
-            let text = text.trim();
-            if text.is_empty() {
-                return Err("body is empty".to_string());
-            }
-            match serde_json::from_str::<Value>(text) {
-                Ok(inner) if !matches!(inner, Value::String(_)) => parse_payload(inner),
-                _ => Ok(RunRequest {
-                    command: text.to_string(),
-                    ..RunRequest::default()
-                }),
-            }
-        }
-        Value::Object(_) => serde_json::from_value(value)
-            .map_err(|error| format!("body is not a valid run request: {error}")),
-        other => Err(format!(
-            "body must be a JSON object or command string, got {}",
-            value_kind(&other)
-        )),
-    }
-}
-
-fn value_kind(value: &Value) -> &'static str {
-    match value {
-        Value::Null => "null",
-        Value::Bool(_) => "a boolean",
-        Value::Number(_) => "a number",
-        Value::String(_) => "a string",
-        Value::Array(_) => "an array",
-        Value::Object(_) => "an object",
-    }
-}
-
-fn parse_command(command: &str) -> Option<Command> {
-    match command {
-        "Algorithm" => Some(Command::Algorithm),
-        "Execute" => Some(Command::Execute),
-        "Metadata" => Some(Command::Metadata),
-        "Preferences" => Some(Command::Preferences),
-        "Signals" => Some(Command::Signals),
-        _ => None,
-    }
-}
-
-/// Materialise an inline base64 payload or a path into a temporary file. The
-/// algorithm reads its protobuf inputs from disk, so both representations are
-/// normalised to a file path. When neither is provided, the input is omitted.
-fn materialize(inline: Option<&str>, path: Option<&str>) -> io::Result<Option<TempFile>> {
-    let bytes = match (inline, path) {
-        (_, Some(path)) if !path.is_empty() => fs::read(path)?,
-        (Some(inline), _) if !inline.is_empty() => decode_base64(inline)
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?,
-        _ => return Ok(None),
-    };
-
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    let id = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let path = std::env::temp_dir().join(format!("build-runner-{}-{id}.bin", std::process::id()));
-    fs::write(&path, bytes)?;
-    Ok(Some(TempFile { path }))
+    serde_json::from_str(body).map_err(|error| format!("body is not a valid run request: {error}"))
 }
 
 /// Invoke the algorithm entry point with the resolved arguments.
-fn invoke(args: &Args) -> Result<i32, NulError> {
+fn invoke(command: &Command) -> Result<i32, NulError> {
+    let (name, strategy_name, strategy_context, portfolio) = fields(command);
     let program = cstring("build-runner")?;
-    let command = cstring(command_name(args.command))?;
-    let strategy_name = cstring(&args.strategy_name)?;
-    let strategy_context = cstring(&args.strategy_context_path)?;
-    let portfolio = cstring(&args.portfolio_path)?;
+    let command_name = cstring(name)?;
+    let strategy_name = cstring(strategy_name)?;
+    let strategy_context = cstring(strategy_context)?;
+    let portfolio = cstring(portfolio)?;
     let argv = [
         program.as_ptr(),
-        command.as_ptr(),
+        command_name.as_ptr(),
         strategy_name.as_ptr(),
         strategy_context.as_ptr(),
         portfolio.as_ptr(),
@@ -240,47 +91,33 @@ fn invoke(args: &Args) -> Result<i32, NulError> {
     Ok(unsafe { entry(argv.len() as i32, argv.as_ptr()) })
 }
 
-fn command_name(command: Command) -> &'static str {
+/// Project a `Command` onto the fixed argv layout expected by `entry`.
+fn fields(command: &Command) -> (&'static str, &str, &str, &str) {
     match command {
-        Command::Algorithm => "Algorithm",
-        Command::Execute => "Execute",
-        Command::Metadata => "Metadata",
-        Command::Preferences => "Preferences",
-        Command::Signals => "Signals",
+        Command::Algorithm { strategy_name } => ("Algorithm", strategy_name, "", ""),
+        Command::Execute {
+            strategy_name,
+            strategy_context_path,
+            portfolio_path,
+        } => (
+            "Execute",
+            strategy_name,
+            strategy_context_path,
+            portfolio_path,
+        ),
+        Command::Metadata { strategy_name } => ("Metadata", strategy_name, "", ""),
+        Command::Preferences { strategy_name } => ("Preferences", strategy_name, "", ""),
+        Command::Signals {
+            strategy_name,
+            strategy_context_path,
+        } => ("Signals", strategy_name, strategy_context_path, ""),
         // `Command` is `#[non_exhaustive]`.
-        _ => "Algorithm",
+        _ => ("Algorithm", "", "", ""),
     }
 }
 
 fn cstring(value: &str) -> Result<CString, NulError> {
     CString::new(value)
-}
-
-/// Decode standard base64, ignoring padding and whitespace.
-fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
-    let mut output = Vec::with_capacity(input.len() / 4 * 3);
-    let mut accumulator: u32 = 0;
-    let mut bits: u32 = 0;
-    for byte in input.bytes() {
-        if byte == b'=' || byte.is_ascii_whitespace() {
-            continue;
-        }
-        let value = match byte {
-            b'A'..=b'Z' => byte - b'A',
-            b'a'..=b'z' => byte - b'a' + 26,
-            b'0'..=b'9' => byte - b'0' + 52,
-            b'+' => 62,
-            b'/' => 63,
-            other => return Err(format!("invalid base64 character: {other}")),
-        } as u32;
-        accumulator = (accumulator << 6) | value;
-        bits += 6;
-        if bits >= 8 {
-            bits -= 8;
-            output.push((accumulator >> bits) as u8);
-        }
-    }
-    Ok(output)
 }
 
 /// Borrow a `(pointer, length)` pair as a byte slice.

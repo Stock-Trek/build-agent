@@ -1,5 +1,4 @@
 use crate::{
-    args::Args,
     command::Command,
     error::{BaError, BaResult},
     exit_codes::SUCCESS,
@@ -16,17 +15,20 @@ use stock_trek::{
 #[traitreg::registry(Algorithm)]
 static ALGORITHM_REGISTRY: () = ();
 
-pub fn run(args: Args) -> i32 {
-    let result = select_algorithm(&args.strategy_name).and_then(|algorithm| match args.command {
-        Command::Algorithm => cmd_algorithm(algorithm.as_ref()),
-        Command::Execute => cmd_execute(
-            algorithm.as_ref(),
-            &args.strategy_context_path,
-            &args.portfolio_path,
-        ),
-        Command::Metadata => cmd_metadata(algorithm.as_ref()),
-        Command::Preferences => cmd_preferences(algorithm.as_ref()),
-        Command::Signals => cmd_signals(algorithm.as_ref(), &args.strategy_context_path),
+pub fn run(command: Command) -> i32 {
+    let result = select_algorithm(command.strategy_name()).and_then(|algorithm| match &command {
+        Command::Algorithm { .. } => cmd_algorithm(algorithm.as_ref()),
+        Command::Execute {
+            strategy_context_path,
+            portfolio_path,
+            ..
+        } => cmd_execute(algorithm.as_ref(), strategy_context_path, portfolio_path),
+        Command::Metadata { .. } => cmd_metadata(algorithm.as_ref()),
+        Command::Preferences { .. } => cmd_preferences(algorithm.as_ref()),
+        Command::Signals {
+            strategy_context_path,
+            ..
+        } => cmd_signals(algorithm.as_ref(), strategy_context_path),
     });
     match result {
         Ok(()) => SUCCESS,
