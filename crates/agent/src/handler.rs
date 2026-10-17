@@ -5,10 +5,11 @@ use crate::{
 use axum::{body::Bytes, http::StatusCode};
 use std::{process::Stdio, time::Duration};
 use tokio::{
-    io::{AsyncBufReadExt, BufReader},
+    io::{AsyncBufReadExt, AsyncRead, BufReader},
     process::Command,
     time::timeout,
 };
+use tracing::warn;
 
 const BUILD_RUNNER: &str = "/usr/local/bin/build-runner";
 
@@ -79,19 +80,8 @@ impl Handler {
         let stdout = child.stdout.take().ok_or(BaError::MissingPipe("stdout"))?;
         let stderr = child.stderr.take().ok_or(BaError::MissingPipe("stderr"))?;
 
-        let stdout_task = tokio::spawn(async move {
-            let mut lines = BufReader::new(stdout).lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                println!("{line}");
-            }
-        });
-
-        let stderr_task = tokio::spawn(async move {
-            let mut lines = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                eprintln!("{line}");
-            }
-        });
+        let stdout_task = tokio::spawn(Self::forward_output(stdout, |line| println!("{line}")));
+        let stderr_task = tokio::spawn(Self::forward_output(stderr, |line| eprintln!("{line}")));
 
         let status = child.wait().await.map_err(BaError::WaitForRunner)?;
 
@@ -106,5 +96,35 @@ impl Handler {
         }
 
         Ok(())
+    }
+
+    /// Forward child output line-by-line without requiring it to be valid UTF-8.
+    ///
+    /// Reading bytes up to each newline avoids the `BufReader::lines()` behaviour
+    /// of terminating on the first invalid UTF-8 sequence, which would leave the
+    /// pipe unread and let the child block once the pipe buffer fills.
+    async fn forward_output<R, F>(reader: R, mut write: F)
+    where
+        R: AsyncRead + Unpin + Send,
+        F: FnMut(&str) + Send,
+    {
+        let mut reader = BufReader::new(reader);
+        let mut buffer = Vec::new();
+        loop {
+            buffer.clear();
+            match reader.read_until(b'\n', &mut buffer).await {
+                Ok(0) => break,
+                Ok(_) => {
+                    let line = String::from_utf8_lossy(&buffer);
+                    let line = line.strip_suffix('\n').unwrap_or(&line);
+                    let line = line.strip_suffix('\r').unwrap_or(line);
+                    write(line);
+                }
+                Err(error) => {
+                    warn!("failed to read build runner output: {error}");
+                    break;
+                }
+            }
+        }
     }
 }
