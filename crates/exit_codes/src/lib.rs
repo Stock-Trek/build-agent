@@ -76,6 +76,8 @@ impl ExitCode {
                 | Self::ServerEntryFailedToParseRequest
                 | Self::ServerEntryInvalidArgument
                 | Self::StrategyNotFound
+                | Self::StrategyHasNoConstructor
+                | Self::StrategyCouldNotInstantiate
                 | Self::ServerRunnerStrategyContextFileNotFound
                 | Self::ServerRunnerStrategyContextNotDecoded
                 | Self::ServerRunnerStrategyContextNotCreated
