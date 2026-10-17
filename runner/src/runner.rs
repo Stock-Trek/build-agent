@@ -7,7 +7,6 @@ use crate::{
     generated::dto::{PortfolioDto, StrategyContextDto},
 };
 
-type BaResult<T> = Result<T, ExitCode>;
 use prost::Message;
 use stock_trek::{
     Algorithm, ResolvedContext, StrategyContext, prelude::traitreg, signals::SignalContext,
@@ -37,7 +36,7 @@ pub fn run(command: Command) -> i32 {
     }
 }
 
-fn select_algorithm(strategy_name: &str) -> BaResult<Box<dyn Algorithm>> {
+fn select_algorithm(strategy_name: &str) -> Result<Box<dyn Algorithm>, ExitCode> {
     let mut has_constructorless_registration = false;
     let mut has_instantiable_registration = false;
     let mut failed_to_instantiate = false;
@@ -62,7 +61,7 @@ fn select_algorithm(strategy_name: &str) -> BaResult<Box<dyn Algorithm>> {
     Err(ExitCode::StrategyNotFound)
 }
 
-fn cmd_algorithm(algorithm: &dyn Algorithm) -> BaResult<()> {
+fn cmd_algorithm(algorithm: &dyn Algorithm) -> Result<(), ExitCode> {
     let command = algorithm.strategy(&StrategyContext::new());
     enqueue_strategy(command).map_err(|_| ExitCode::ServerEntryFailedToEnqueueJson)
 }
@@ -71,7 +70,7 @@ fn cmd_execute(
     algorithm: &dyn Algorithm,
     strategy_context_path: &str,
     portfolio_path: &str,
-) -> BaResult<()> {
+) -> Result<(), ExitCode> {
     cmd_metadata(algorithm)?;
     let signal_context = load_signal_context(strategy_context_path)?;
     let portfolio_data =
@@ -94,24 +93,24 @@ fn cmd_execute(
         .map_err(|_| ExitCode::BotErrorResolvingAction)
 }
 
-fn cmd_metadata(algorithm: &dyn Algorithm) -> BaResult<()> {
+fn cmd_metadata(algorithm: &dyn Algorithm) -> Result<(), ExitCode> {
     let name = algorithm.name();
     let description = algorithm.description();
     enqueue_metadata(name, description).map_err(|_| ExitCode::ServerEntryFailedToEnqueueJson)
 }
 
-fn cmd_preferences(algorithm: &dyn Algorithm) -> BaResult<()> {
+fn cmd_preferences(algorithm: &dyn Algorithm) -> Result<(), ExitCode> {
     let preferences = algorithm.preferences();
     enqueue_preferences(preferences).map_err(|_| ExitCode::ServerEntryFailedToEnqueueJson)
 }
 
-fn cmd_signals(algorithm: &dyn Algorithm, strategy_context_path: &str) -> BaResult<()> {
+fn cmd_signals(algorithm: &dyn Algorithm, strategy_context_path: &str) -> Result<(), ExitCode> {
     let signal_context = load_signal_context(strategy_context_path)?;
     let signals = algorithm.signals(&signal_context);
     enqueue_signals(signals).map_err(|_| ExitCode::ServerEntryFailedToEnqueueJson)
 }
 
-fn load_signal_context(strategy_context_path: &str) -> BaResult<SignalContext> {
+fn load_signal_context(strategy_context_path: &str) -> Result<SignalContext, ExitCode> {
     let strategy_context_data = std::fs::read(strategy_context_path)
         .map_err(|_| ExitCode::ServerRunnerStrategyContextFileNotFound)?;
     let strategy_context_dto = StrategyContextDto::decode(&strategy_context_data[..])
