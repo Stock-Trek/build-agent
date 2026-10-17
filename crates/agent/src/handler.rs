@@ -32,7 +32,7 @@ impl Handler {
             .unwrap_or(Err(BaError::Timeout(self.build_timeout)));
         match result {
             Ok(()) => match self.publish_artifacts().await {
-                Ok(()) => (StatusCode::OK, "accepted"),
+                Ok(()) => (StatusCode::OK, "success"),
                 Err(error) => {
                     eprintln!("artifact upload failed: {error}");
                     (error.status(), error.message())
@@ -104,13 +104,10 @@ impl Handler {
         let _ = stderr_task.await;
 
         if !status.success() {
-            return Err(
-                if status.code().is_some_and(exit_codes::is_invalid_request) {
-                    BaError::InvalidRequest
-                } else {
-                    BaError::RunnerFailed(status)
-                },
-            );
+            return Err(status
+                .code()
+                .and_then(BaError::from_exit_code)
+                .unwrap_or(BaError::RunnerFailed(status)));
         }
 
         Ok(())
