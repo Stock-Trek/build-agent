@@ -32,7 +32,10 @@ pub fn run(command: Command) -> i32 {
     });
     match result {
         Ok(()) => ExitCode::Success.code(),
-        Err(error) => error.code(),
+        Err(error) => {
+            eprintln!("{error}");
+            error.code()
+        }
     }
 }
 

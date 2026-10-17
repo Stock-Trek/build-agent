@@ -3,7 +3,11 @@ use crate::{
     error::{BaError, BaResult},
 };
 use axum::{body::Bytes, http::StatusCode};
-use std::{process::Stdio, time::Duration};
+use std::{
+    process::Stdio,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, BufReader},
     process::Command,
@@ -27,22 +31,32 @@ impl Handler {
         }
     }
 
-    pub async fn handle(&self, body: Bytes) -> (StatusCode, &'static str) {
-        let result = timeout(self.build_timeout, self.run_build(body))
+    pub async fn handle(&self, body: Bytes) -> (StatusCode, String) {
+        let mut stderr_output = String::new();
+        let result = timeout(self.build_timeout, self.run_build(body, &mut stderr_output))
             .await
             .unwrap_or(Err(BaError::Timeout(self.build_timeout)));
         match result {
             Ok(()) => match self.publish_artifacts().await {
-                Ok(()) => (StatusCode::OK, "success"),
+                Ok(()) => (StatusCode::OK, "success".to_string()),
                 Err(error) => {
                     eprintln!("artifact upload failed: {error}");
-                    (error.status(), error.message())
+                    (error.status(), error.detail())
                 }
             },
             Err(error) => {
                 eprintln!("build failed: {error}");
-                (error.status(), error.message())
+                (error.status(), Self::failure_body(&error, &stderr_output))
             }
+        }
+    }
+
+    fn failure_body(error: &BaError, stderr_output: &str) -> String {
+        let detail = error.detail();
+        if stderr_output.is_empty() {
+            detail
+        } else {
+            format!("{detail}\n{stderr_output}")
         }
     }
 
@@ -51,7 +65,7 @@ impl Handler {
         self.artifacts.publish(&cwasm).await
     }
 
-    async fn run_build(&self, body: Bytes) -> BaResult<()> {
+    async fn run_build(&self, body: Bytes, stderr_output: &mut String) -> BaResult<()> {
         // Pass the raw request body through to the build runner, which is
         // responsible for parsing the algorithm invocation.
         let mut child = Command::new(BUILD_RUNNER)
@@ -81,7 +95,14 @@ impl Handler {
         let stderr = child.stderr.take().ok_or(BaError::MissingPipe("stderr"))?;
 
         let stdout_task = tokio::spawn(Self::forward_output(stdout, |line| println!("{line}")));
-        let stderr_task = tokio::spawn(Self::forward_output(stderr, |line| eprintln!("{line}")));
+        let stderr_lines = Arc::new(Mutex::new(Vec::new()));
+        let stderr_buffer = Arc::clone(&stderr_lines);
+        let stderr_task = tokio::spawn(Self::forward_output(stderr, move |line| {
+            eprintln!("{line}");
+            if let Ok(mut lines) = stderr_buffer.lock() {
+                lines.push(line.to_string());
+            }
+        }));
 
         let status = child.wait().await.map_err(BaError::WaitForRunner)?;
 
@@ -89,6 +110,9 @@ impl Handler {
         let _ = stderr_task.await;
 
         if !status.success() {
+            if let Ok(lines) = stderr_lines.lock() {
+                *stderr_output = lines.join("\n");
+            }
             return Err(status
                 .code()
                 .and_then(BaError::from_exit_code)
