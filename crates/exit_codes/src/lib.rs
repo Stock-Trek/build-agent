@@ -149,6 +149,8 @@ mod tests {
         assert!(ExitCode::StrategyCouldNotInstantiate.is_client_error());
         assert!(is_client_error(ExitCode::StrategyNotFound.code()));
         assert!(is_client_error(ExitCode::StrategyHasNoConstructor.code()));
-        assert!(is_client_error(ExitCode::StrategyCouldNotInstantiate.code()));
+        assert!(is_client_error(
+            ExitCode::StrategyCouldNotInstantiate.code()
+        ));
     }
 }
