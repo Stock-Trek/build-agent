@@ -39,6 +39,7 @@ impl Artifacts {
             .arg(WASM_TARGET)
             .arg("--release")
             .arg("--lib")
+            .kill_on_drop(true)
             .status()
             .await
             .map_err(|source| BaError::CompileArtifact {
@@ -70,6 +71,7 @@ impl Artifacts {
             .arg(module)
             .arg("-o")
             .arg(&output)
+            .kill_on_drop(true)
             .status()
             .await
             .map_err(|source| BaError::CompileArtifact {
