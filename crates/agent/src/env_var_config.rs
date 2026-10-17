@@ -15,6 +15,7 @@ const DEFAULT_ADDRESS: &str = "0.0.0.0:8080";
 const BUILD_TIMEOUT_ENV: &str = "BUILD_AGENT_TIMEOUT_SECS";
 const DEFAULT_BUILD_TIMEOUT_SECS: u64 = 300;
 const DEFAULT_LOG_FILTER: &str = "info";
+const SIGNED_GET_URL_ENV: &str = "SIGNED_GET_URL";
 const SIGNED_POST_URL_ENV: &str = "SIGNED_POST_URL";
 const SIGNED_POST_FIELDS_ENV: &str = "SIGNED_POST_FIELDS";
 
@@ -23,6 +24,7 @@ pub struct EnvVarConfig {
     address: String,
     build_timeout: Duration,
     log_filter: EnvFilter,
+    signed_get_url: String,
     signed_post: SignedPost,
 }
 
@@ -32,6 +34,7 @@ impl EnvVarConfig {
             address: Self::address_from_env()?,
             build_timeout: Self::build_timeout_from_env()?,
             log_filter: Self::log_filter_from_env()?,
+            signed_get_url: Self::required(SIGNED_GET_URL_ENV)?,
             signed_post: Self::signed_post_from_env()?,
         })
     }
@@ -46,6 +49,10 @@ impl EnvVarConfig {
 
     pub fn log_filter(&self) -> EnvFilter {
         self.log_filter.clone()
+    }
+
+    pub fn signed_get_url(&self) -> &str {
+        &self.signed_get_url
     }
 
     pub fn signed_post(&self) -> SignedPost {

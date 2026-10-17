@@ -64,6 +64,32 @@ pub enum BaError {
         source: std::io::Error,
     },
 
+    #[error("failed to download user generated code")]
+    DownloadUserGenerated(#[source] reqwest::Error),
+
+    #[error("failed to read the user generated code response")]
+    ReadUserGeneratedResponse(#[source] reqwest::Error),
+
+    #[error("download of user generated code was rejected with status {status}: {body}")]
+    DownloadUserGeneratedRejected { status: u16, body: String },
+
+    #[error("failed to open the user generated archive")]
+    OpenUserGeneratedArchive(#[source] zip::result::ZipError),
+
+    #[error("failed to extract user generated file {path}")]
+    ExtractUserGenerated {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("failed to write user generated file {path}")]
+    WriteUserGenerated {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("failed to build the upload request for {path}")]
     BuildUploadRequest {
         path: PathBuf,
