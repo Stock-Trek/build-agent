@@ -23,7 +23,7 @@ pub struct EnvVarConfig {
     address: String,
     build_timeout: Duration,
     log_filter: EnvFilter,
-    signed_post: Option<SignedPost>,
+    signed_post: SignedPost,
 }
 
 impl EnvVarConfig {
@@ -48,7 +48,7 @@ impl EnvVarConfig {
         self.log_filter.clone()
     }
 
-    pub fn signed_post(&self) -> Option<SignedPost> {
+    pub fn signed_post(&self) -> SignedPost {
         self.signed_post.clone()
     }
 
@@ -77,23 +77,13 @@ impl EnvVarConfig {
         }
     }
 
-    fn signed_post_from_env() -> BaResult<Option<SignedPost>> {
-        let url = Self::optional(SIGNED_POST_URL_ENV)?.filter(|value| !value.trim().is_empty());
-        let fields =
-            Self::optional(SIGNED_POST_FIELDS_ENV)?.filter(|value| !value.trim().is_empty());
-        match (url, fields) {
-            (None, None) => Ok(None),
-            (Some(_), None) => Err(BaError::Config(format!(
-                "{SIGNED_POST_FIELDS_ENV} must be set when {SIGNED_POST_URL_ENV} is set"
-            ))),
-            (None, Some(_)) => Err(BaError::Config(format!(
-                "{SIGNED_POST_URL_ENV} must be set when {SIGNED_POST_FIELDS_ENV} is set"
-            ))),
-            (Some(url), Some(fields)) => Ok(Some(SignedPost::new(
-                url,
-                Self::parse_signed_post_fields(&fields)?,
-            ))),
-        }
+    fn signed_post_from_env() -> BaResult<SignedPost> {
+        let url = Self::required(SIGNED_POST_URL_ENV)?;
+        let fields = Self::required(SIGNED_POST_FIELDS_ENV)?;
+        Ok(SignedPost::new(
+            url,
+            Self::parse_signed_post_fields(&fields)?,
+        ))
     }
 
     fn parse_signed_post_fields(json: &str) -> BaResult<BTreeMap<String, String>> {
@@ -121,6 +111,13 @@ impl EnvVarConfig {
             fields.insert(name.clone(), text);
         }
         Ok(fields)
+    }
+
+    fn required(name: &str) -> BaResult<String> {
+        match Self::optional(name)? {
+            Some(value) if !value.trim().is_empty() => Ok(value),
+            _ => Err(BaError::Config(format!("{name} must be set"))),
+        }
     }
 
     fn optional(name: &str) -> BaResult<Option<String>> {

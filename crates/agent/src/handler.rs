@@ -15,11 +15,11 @@ const BUILD_RUNNER: &str = "/usr/local/bin/build-runner";
 #[derive(Clone)]
 pub struct Handler {
     build_timeout: Duration,
-    artifacts: Option<Artifacts>,
+    artifacts: Artifacts,
 }
 
 impl Handler {
-    pub fn new(build_timeout: Duration, artifacts: Option<Artifacts>) -> Self {
+    pub fn new(build_timeout: Duration, artifacts: Artifacts) -> Self {
         Self {
             build_timeout,
             artifacts,
@@ -46,13 +46,8 @@ impl Handler {
     }
 
     async fn publish_artifacts(&self) -> BaResult<()> {
-        match &self.artifacts {
-            Some(artifacts) => {
-                let cwasm = Artifacts::compile().await?;
-                artifacts.publish(&cwasm).await
-            }
-            None => Ok(()),
-        }
+        let cwasm = Artifacts::compile().await?;
+        self.artifacts.publish(&cwasm).await
     }
 
     async fn run_build(&self, body: Bytes) -> BaResult<()> {
