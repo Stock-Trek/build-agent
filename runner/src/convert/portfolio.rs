@@ -79,9 +79,15 @@ impl TryFrom<PendingOrderDto> for PendingOrder {
             filled_quote_quantity_dto,
         } = value;
         Ok(PendingOrder::new(
-            order_request_dto.required()?.try_into()?,
-            filled_base_quantity_dto.required()?.try_into()?,
-            filled_quote_quantity_dto.required()?.try_into()?,
+            order_request_dto
+                .required("order_request_dto")?
+                .try_into()?,
+            filled_base_quantity_dto
+                .required("filled_base_quantity_dto")?
+                .try_into()?,
+            filled_quote_quantity_dto
+                .required("filled_quote_quantity_dto")?
+                .try_into()?,
         ))
     }
 }
@@ -96,8 +102,8 @@ impl TryFrom<AssetCountDto> for (AssetId, Decimal) {
         } = value;
         use crate::convert::required::IsRequired;
         Ok((
-            asset_id_dto.required()?.try_into()?,
-            count_dto.required()?.try_into()?,
+            asset_id_dto.required("asset_id_dto")?.try_into()?,
+            count_dto.required("count_dto")?.try_into()?,
         ))
     }
 }

@@ -38,15 +38,19 @@ impl TryFrom<AssetMarketsDto> for CexMarketDataByBaseContext {
                 base_asset_id_dto,
                 markets_by_quote_dto,
             } = market_by_base;
-            let base_asset_id = base_asset_id_dto.required()?.try_into()?;
+            let base_asset_id = base_asset_id_dto
+                .required("base_asset_id_dto")?
+                .try_into()?;
             let mut markets_by_quote = HashMap::new();
             for market_by_quote_dto in markets_by_quote_dto {
                 let MarketByQuoteDto {
                     quote_asset_id_dto,
                     market_dto,
                 } = market_by_quote_dto;
-                let quote_asset_id = quote_asset_id_dto.required()?.try_into()?;
-                let market = market_dto.required()?.try_into()?;
+                let quote_asset_id = quote_asset_id_dto
+                    .required("quote_asset_id_dto")?
+                    .try_into()?;
+                let market = market_dto.required("market_dto")?.try_into()?;
                 markets_by_quote.insert(quote_asset_id, market);
             }
             markets_by_base.insert(
