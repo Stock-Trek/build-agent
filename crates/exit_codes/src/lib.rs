@@ -76,6 +76,8 @@ impl ExitCode {
                 | Self::ServerEntryFailedToParseRequest
                 | Self::ServerEntryInvalidArgument
                 | Self::StrategyNotFound
+                | Self::StrategyHasNoConstructor
+                | Self::StrategyCouldNotInstantiate
                 | Self::ServerRunnerStrategyContextFileNotFound
                 | Self::ServerRunnerStrategyContextNotDecoded
                 | Self::ServerRunnerStrategyContextNotCreated
@@ -134,4 +136,19 @@ pub fn is_client_error(code: i32) -> bool {
 
 pub fn is_invalid_request(code: i32) -> bool {
     is_client_error(code)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strategy_failures_are_client_errors() {
+        assert!(ExitCode::StrategyNotFound.is_client_error());
+        assert!(ExitCode::StrategyHasNoConstructor.is_client_error());
+        assert!(ExitCode::StrategyCouldNotInstantiate.is_client_error());
+        assert!(is_client_error(ExitCode::StrategyNotFound.code()));
+        assert!(is_client_error(ExitCode::StrategyHasNoConstructor.code()));
+        assert!(is_client_error(ExitCode::StrategyCouldNotInstantiate.code()));
+    }
 }
