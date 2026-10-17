@@ -34,6 +34,6 @@ impl TryFrom<DecimalDto> for Decimal {
 impl TryFrom<DecimalDto> for f64 {
     type Error = StockTrekError;
     fn try_from(value: DecimalDto) -> Result<Self, Self::Error> {
-        value.to_decimal()?.to_f64().required()
+        value.to_decimal()?.to_f64().required("f64")
     }
 }

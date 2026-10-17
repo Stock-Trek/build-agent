@@ -18,7 +18,7 @@ impl TryFrom<MarketCandleDto> for MarketCandle {
             end_time_millis_exc,
             duration_millis,
             is_candle_closed,
-            ohlcv_dto.required()?.try_into()?,
+            ohlcv_dto.required("ohlcv_dto")?.try_into()?,
             trade_count,
         ))
     }

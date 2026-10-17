@@ -14,9 +14,9 @@ impl TryFrom<MarketTickDto> for MarketTick {
             ask_dto,
             last_dto,
         } = value;
-        let bid = bid_dto.required()?.try_into()?;
-        let ask = ask_dto.required()?.try_into()?;
-        let last = last_dto.required()?.try_into()?;
+        let bid = bid_dto.required("bid_dto")?.try_into()?;
+        let ask = ask_dto.required("ask_dto")?.try_into()?;
+        let last = last_dto.required("last_dto")?.try_into()?;
         Ok(MarketTick {
             timestamp_millis,
             bid,

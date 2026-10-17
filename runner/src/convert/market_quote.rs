@@ -9,8 +9,8 @@ impl TryFrom<MarketQuoteDto> for MarketQuote {
             price_dto,
             quantity_dto,
         } = value;
-        let price = price_dto.required()?.try_into()?;
-        let quantity = quantity_dto.required()?.try_into()?;
+        let price = price_dto.required("price_dto")?.try_into()?;
+        let quantity = quantity_dto.required("quantity_dto")?.try_into()?;
         Ok(MarketQuote { price, quantity })
     }
 }

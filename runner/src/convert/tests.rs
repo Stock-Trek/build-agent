@@ -175,12 +175,12 @@ fn decimal_dto_rejects_scale_above_max() {
 
 #[test]
 fn required_unwraps_some() {
-    assert_eq!(Some(7u32).required().unwrap(), 7);
+    assert_eq!(Some(7u32).required("value").unwrap(), 7);
 }
 
 #[test]
 fn required_errors_on_none() {
-    assert!(None::<u32>.required().is_err());
+    assert!(None::<u32>.required("value").is_err());
 }
 
 #[test]
