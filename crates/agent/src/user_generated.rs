@@ -125,7 +125,6 @@ impl UserGenerated {
     }
 
     fn relative_path(path: &Path) -> BaResult<PathBuf> {
-        let path = path.strip_prefix(USER_GENERATED_DIR).unwrap_or(path);
         let mut relative = PathBuf::new();
         for component in path.components() {
             match component {
@@ -191,25 +190,6 @@ mod tests {
                 .await
                 .unwrap(),
             "custom"
-        );
-    }
-
-    #[tokio::test]
-    async fn strips_the_user_generated_directory_prefix() {
-        let directory = tempfile::tempdir().unwrap();
-        let root = directory.path().join(USER_GENERATED_DIR);
-
-        source(root.clone())
-            .extract(&archive(&[(
-                "runner/src/user_generated/algorithm.rs",
-                b"generated",
-            )]))
-            .await
-            .unwrap();
-
-        assert_eq!(
-            fs::read_to_string(root.join("algorithm.rs")).await.unwrap(),
-            "generated"
         );
     }
 
