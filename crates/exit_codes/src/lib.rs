@@ -31,11 +31,40 @@ pub const BOT_ERROR_CREATING_SCRATCH_PAD: i32 = 202;
 pub const BOT_ERROR_RESOLVING_ACTION: i32 = 203;
 pub const BOT_ERROR_PANIC: i32 = 204;
 
-pub fn is_invalid_request(code: i32) -> bool {
-    matches!(
-        code,
-        SERVER_ENTRY_FAILED_TO_PARSE_REQUEST
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClientError {
+    InvalidRequest,
+    StrategyNotFound,
+    StrategyContextNotFound,
+    StrategyContextNotDecoded,
+    StrategyContextNotCreated,
+    PortfolioNotFound,
+    PortfolioNotDecoded,
+    PortfolioNotCreated,
+}
+
+impl ClientError {
+    pub fn from_code(code: i32) -> Option<Self> {
+        Some(match code {
+            SERVER_ENTRY_FAILED_TO_PARSE_REQUEST
             | SERVER_ENTRY_FAILED_TO_PARSE_COMMAND
-            | SERVER_ENTRY_INVALID_ARGUMENT
-    )
+            | SERVER_ENTRY_INVALID_ARGUMENT => Self::InvalidRequest,
+            STRATEGY_NOT_FOUND => Self::StrategyNotFound,
+            SERVER_RUNNER_STRATEGY_CONTEXT_FILE_NOT_FOUND => Self::StrategyContextNotFound,
+            SERVER_RUNNER_STRATEGY_CONTEXT_NOT_DECODED => Self::StrategyContextNotDecoded,
+            SERVER_RUNNER_STRATEGY_CONTEXT_NOT_CREATED => Self::StrategyContextNotCreated,
+            SERVER_RUNNER_PORTFOLIO_FILE_NOT_FOUND => Self::PortfolioNotFound,
+            SERVER_RUNNER_PORTFOLIO_NOT_DECODED => Self::PortfolioNotDecoded,
+            SERVER_RUNNER_PORTFOLIO_NOT_CREATED => Self::PortfolioNotCreated,
+            _ => return None,
+        })
+    }
+}
+
+pub fn is_client_error(code: i32) -> bool {
+    ClientError::from_code(code).is_some()
+}
+
+pub fn is_invalid_request(code: i32) -> bool {
+    is_client_error(code)
 }
