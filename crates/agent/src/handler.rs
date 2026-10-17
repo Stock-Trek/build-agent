@@ -46,7 +46,7 @@ impl Handler {
     }
 
     async fn publish_artifacts(&self) -> BaResult<()> {
-        let cwasm = Artifacts::compile().await?;
+        let cwasm = self.artifacts.compile().await?;
         self.artifacts.publish(&cwasm).await
     }
 
