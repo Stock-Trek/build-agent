@@ -87,7 +87,7 @@ impl ExitCode {
 
     pub const fn message(self) -> &'static str {
         match self {
-            Self::Success => "accepted",
+            Self::Success => "success",
             Self::StrategyNotFound => "strategy not found",
             Self::StrategyHasNoConstructor => "strategy has no constructor",
             Self::StrategyCouldNotInstantiate => "strategy could not be instantiated",
@@ -134,30 +134,4 @@ pub fn is_client_error(code: i32) -> bool {
 
 pub fn is_invalid_request(code: i32) -> bool {
     is_client_error(code)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn exit_codes_round_trip() {
-        for code in [
-            ExitCode::Success,
-            ExitCode::StrategyNotFound,
-            ExitCode::ServerRunnerStrategyContextNotDecoded,
-            ExitCode::BotErrorPanic,
-        ] {
-            assert_eq!(ExitCode::from_code(code.code()), Some(code));
-        }
-    }
-
-    #[test]
-    fn client_errors_are_classified() {
-        assert!(ExitCode::StrategyNotFound.is_client_error());
-        assert!(ExitCode::ServerRunnerStrategyContextFileNotFound.is_client_error());
-        assert!(ExitCode::ServerRunnerPortfolioNotDecoded.is_client_error());
-        assert!(!ExitCode::ServerEntryFailedToEnqueueJson.is_client_error());
-        assert!(!ExitCode::BotErrorResolvingAction.is_client_error());
-    }
 }

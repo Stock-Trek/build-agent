@@ -32,7 +32,7 @@ impl Handler {
             .unwrap_or(Err(BaError::Timeout(self.build_timeout)));
         match result {
             Ok(()) => match self.publish_artifacts().await {
-                Ok(()) => (StatusCode::OK, "accepted"),
+                Ok(()) => (StatusCode::OK, "success"),
                 Err(error) => {
                     eprintln!("artifact upload failed: {error}");
                     (error.status(), error.message())
