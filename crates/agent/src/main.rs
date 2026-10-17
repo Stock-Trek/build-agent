@@ -24,8 +24,8 @@ const HEALTH_PATH: &str = "/health";
 async fn main() -> BaResult<()> {
     let config = EnvVarConfig::from_env()?;
     TracingSetup::setup(config.log_filter())?;
-    let artifacts = Artifacts::new(config.signed_post());
-    let cwasm = Artifacts::compile().await?;
+    let artifacts = Artifacts::new(config.signed_post())?;
+    let cwasm = artifacts.compile().await?;
     artifacts.publish(&cwasm).await?;
     let handler = Handler::new(config.build_timeout(), artifacts);
     let app = Router::new().route(HEALTH_PATH, get(health)).route(

@@ -2,14 +2,19 @@ use crate::{
     error::{BaError, BaResult},
     s3::SignedPost,
 };
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+use tempfile::TempDir;
 use tokio::{fs, process::Command};
 use tracing::info;
 
 const WASM_MANIFEST: &str = "runner/Cargo.toml";
 const WASM_TARGET: &str = "wasm32-wasip1";
-const WASM_ARTIFACT: &str = "/app/target/wasm32-wasip1/release/runner.wasm";
-const CWASM_ARTIFACT: &str = "/tmp/runner.cwasm";
+const WASM_ARTIFACT_FILE: &str = "runner.wasm";
+const CWASM_ARTIFACT_FILE: &str = "runner.cwasm";
+const TARGET_DIR: &str = "target";
 const USER_GENERATED_DIR: &str = "runner/src/user_generated";
 const CARGO: &str = "cargo";
 const WASMTIME: &str = "wasmtime";
@@ -17,26 +22,37 @@ const WASMTIME: &str = "wasmtime";
 #[derive(Clone)]
 pub struct Artifacts {
     signed_post: SignedPost,
+    build_dir: Arc<TempDir>,
 }
 
 impl Artifacts {
-    pub fn new(signed_post: SignedPost) -> Self {
-        Self { signed_post }
+    pub fn new(signed_post: SignedPost) -> BaResult<Self> {
+        let build_dir = tempfile::tempdir().map_err(BaError::CreateBuildDirectory)?;
+        Ok(Self {
+            signed_post,
+            build_dir: Arc::new(build_dir),
+        })
     }
 
-    pub async fn compile() -> BaResult<PathBuf> {
-        Self::build_wasm().await?;
-        Self::compile_wasm().await
+    pub async fn compile(&self) -> BaResult<PathBuf> {
+        let wasm = self.build_wasm().await?;
+        self.compile_wasm(&wasm).await
     }
 
-    async fn build_wasm() -> BaResult<()> {
-        let module = PathBuf::from(WASM_ARTIFACT);
+    async fn build_wasm(&self) -> BaResult<PathBuf> {
+        let target_dir = self.build_dir.path().join(TARGET_DIR);
+        let module = target_dir
+            .join(WASM_TARGET)
+            .join("release")
+            .join(WASM_ARTIFACT_FILE);
         let status = Command::new(CARGO)
             .arg("build")
             .arg("--manifest-path")
             .arg(WASM_MANIFEST)
             .arg("--target")
             .arg(WASM_TARGET)
+            .arg("--target-dir")
+            .arg(&target_dir)
             .arg("--release")
             .arg("--lib")
             .kill_on_drop(true)
@@ -56,14 +72,14 @@ impl Artifacts {
         info!(
             manifest = WASM_MANIFEST,
             target = WASM_TARGET,
+            target_dir = %target_dir.display(),
             "built wasm artifact"
         );
-        Ok(())
+        Ok(module)
     }
 
-    async fn compile_wasm() -> BaResult<PathBuf> {
-        let module = Path::new(WASM_ARTIFACT);
-        let output = PathBuf::from(CWASM_ARTIFACT);
+    async fn compile_wasm(&self, module: &Path) -> BaResult<PathBuf> {
+        let output = self.build_dir.path().join(CWASM_ARTIFACT_FILE);
         let status = Command::new(WASMTIME)
             .arg("compile")
             .arg("-C")

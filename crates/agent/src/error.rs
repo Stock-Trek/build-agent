@@ -82,6 +82,9 @@ pub enum BaError {
         body: String,
     },
 
+    #[error("failed to create temporary build directory")]
+    CreateBuildDirectory(#[source] std::io::Error),
+
     #[error("failed to compile artifact {path}")]
     CompileArtifact {
         path: PathBuf,
