@@ -87,6 +87,14 @@ impl ExitCode {
         )
     }
 
+    pub fn is_client_error_code(code: i32) -> bool {
+        Self::from_code(code).is_some_and(Self::is_client_error)
+    }
+
+    pub fn is_invalid_request_code(code: i32) -> bool {
+        Self::is_client_error_code(code)
+    }
+
     pub const fn message(self) -> &'static str {
         match self {
             Self::Success => "success",
@@ -131,9 +139,9 @@ impl std::fmt::Display for ExitCode {
 impl std::error::Error for ExitCode {}
 
 pub fn is_client_error(code: i32) -> bool {
-    ExitCode::from_code(code).is_some_and(ExitCode::is_client_error)
+    ExitCode::is_client_error_code(code)
 }
 
 pub fn is_invalid_request(code: i32) -> bool {
-    is_client_error(code)
+    ExitCode::is_invalid_request_code(code)
 }

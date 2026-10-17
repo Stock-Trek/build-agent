@@ -5,6 +5,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ancestors()
         .nth(2)
         .ok_or("proto-gen lives under the workspace root")?;
-    proto_gen::generate(&root.join("proto"), &root.join("runner/src/generated"))?;
+    proto_gen::ProtoGen::generate(&root.join("proto"), &root.join("runner/src/generated"))?;
     Ok(())
 }

@@ -4,7 +4,7 @@ use crate::generated::dto::{
     quantity_dto::Quantity as QuantityVariant,
 };
 use crate::{
-    convert::{required::IsRequired, string::from_string},
+    convert::{required::IsRequired, string::JsonString},
     generated::dto::{
         ActivationDto, LimitOrderRequestDto, MarketBuyOrderRequestDto, MarketSellOrderRequestDto,
         OrderRequestDto, QuantityDto,
@@ -46,10 +46,10 @@ impl TryFrom<LimitOrderRequestDto> for OrderRequest<AssetId, Decimal> {
         Ok(OrderRequest::Limit {
             base: base_dto.required("base_dto")?.try_into()?,
             quote: quote_dto.required("quote_dto")?.try_into()?,
-            side: from_string(&side)?,
+            side: JsonString::deserialize(&side)?,
             activation: activation_dto.required("activation_dto")?.try_into()?,
             limit_price: limit_price_dto.required("limit_price_dto")?.try_into()?,
-            time_in_force: from_string(&time_in_force)?,
+            time_in_force: JsonString::deserialize(&time_in_force)?,
             quantity: quantity_dto.required("quantity_dto")?.try_into()?,
             tag: Tag::new(&tag),
         })
@@ -115,9 +115,9 @@ impl TryFrom<ActivationDto> for Activation<Decimal> {
                         .activation_price_dto
                         .required("activation_price_dto")?
                         .try_into()?,
-                    basis: from_string(&price_triggered_dto.basis)?,
-                    direction: from_string(&price_triggered_dto.direction)?,
-                    mode: from_string(&price_triggered_dto.mode)?,
+                    basis: JsonString::deserialize(&price_triggered_dto.basis)?,
+                    direction: JsonString::deserialize(&price_triggered_dto.direction)?,
+                    mode: JsonString::deserialize(&price_triggered_dto.mode)?,
                 })
             }
             ActivationVariant::Trailing(trailing_dto) => Ok(Activation::Trailing {
@@ -125,9 +125,9 @@ impl TryFrom<ActivationDto> for Activation<Decimal> {
                     .activation_price_dto
                     .required("activation_price_dto")?
                     .try_into()?,
-                basis: from_string(&trailing_dto.basis)?,
+                basis: JsonString::deserialize(&trailing_dto.basis)?,
                 callback_rate_bps: trailing_dto.callback_rate_bps,
-                direction: from_string(&trailing_dto.direction)?,
+                direction: JsonString::deserialize(&trailing_dto.direction)?,
             }),
         }
     }
