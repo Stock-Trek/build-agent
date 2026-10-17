@@ -4,6 +4,7 @@ use crate::{
     error::{BaError, BaResult},
     handler::Handler,
     tracing_setup::TracingSetup,
+    user_generated::UserGenerated,
 };
 use axum::{
     Router,
@@ -16,6 +17,7 @@ mod error;
 mod handler;
 mod s3;
 mod tracing_setup;
+mod user_generated;
 
 const RUN_PATH: &str = "/run";
 const HEALTH_PATH: &str = "/health";
@@ -26,6 +28,9 @@ impl BuildAgent {
     async fn run() -> BaResult<()> {
         let config = EnvVarConfig::from_env()?;
         TracingSetup::setup(config.log_filter())?;
+        UserGenerated::new(config.signed_get_url().to_string())
+            .download()
+            .await?;
         let artifacts = Artifacts::new(config.signed_post())?;
         let cwasm = artifacts.compile().await?;
         artifacts.publish(&cwasm).await?;

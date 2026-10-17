@@ -1,6 +1,7 @@
 use crate::{
     error::{BaError, BaResult},
     s3::SignedPost,
+    user_generated::USER_GENERATED_DIR,
 };
 use std::{
     path::{Path, PathBuf},
@@ -15,7 +16,6 @@ const WASM_TARGET: &str = "wasm32-wasip1";
 const WASM_ARTIFACT_FILE: &str = "runner.wasm";
 const CWASM_ARTIFACT_FILE: &str = "runner.cwasm";
 const TARGET_DIR: &str = "target";
-const USER_GENERATED_DIR: &str = "runner/src/user_generated";
 const CARGO: &str = "cargo";
 const WASMTIME: &str = "wasmtime";
 
