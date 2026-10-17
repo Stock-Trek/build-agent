@@ -107,14 +107,27 @@ impl Artifacts {
 
     pub async fn publish(&self, cwasm: &Path) -> BaResult<()> {
         self.signed_post.upload(cwasm).await?;
+        let root = Path::new(USER_GENERATED_DIR);
         for source in Self::user_generated_files().await? {
-            self.signed_post.upload(&source).await?;
+            let name = source.strip_prefix(root).map_err(|_| {
+                BaError::Config(format!(
+                    "artifact path {} is outside {USER_GENERATED_DIR}",
+                    source.display()
+                ))
+            })?;
+            self.signed_post.upload_named(&source, name).await?;
         }
         info!("published build artifacts");
         Ok(())
     }
 
     async fn user_generated_files() -> BaResult<Vec<PathBuf>> {
+        let root = fs::canonicalize(USER_GENERATED_DIR)
+            .await
+            .map_err(|source| BaError::ReadArtifactDirectory {
+                path: PathBuf::from(USER_GENERATED_DIR),
+                source,
+            })?;
         let mut files = Vec::new();
         let mut pending = vec![PathBuf::from(USER_GENERATED_DIR)];
         while let Some(directory) = pending.pop() {
@@ -142,10 +155,42 @@ impl Artifacts {
                             path: directory.clone(),
                             source,
                         })?;
-                if file_type.is_dir() {
+                let resolved =
+                    fs::canonicalize(&path)
+                        .await
+                        .map_err(|source| BaError::ReadArtifact {
+                            path: path.clone(),
+                            source,
+                        })?;
+                if !resolved.starts_with(&root) {
+                    return Err(BaError::Config(format!(
+                        "artifact path {} resolves outside {USER_GENERATED_DIR}",
+                        path.display()
+                    )));
+                }
+
+                let target =
+                    fs::metadata(&resolved)
+                        .await
+                        .map_err(|source| BaError::ReadArtifact {
+                            path: path.clone(),
+                            source,
+                        })?;
+                if target.is_dir() {
+                    if file_type.is_symlink() {
+                        return Err(BaError::Config(format!(
+                            "artifact path {} is a symlinked directory",
+                            path.display()
+                        )));
+                    }
                     pending.push(path);
-                } else {
+                } else if target.is_file() {
                     files.push(path);
+                } else {
+                    return Err(BaError::Config(format!(
+                        "artifact path {} is not a regular file or directory",
+                        path.display()
+                    )));
                 }
             }
         }

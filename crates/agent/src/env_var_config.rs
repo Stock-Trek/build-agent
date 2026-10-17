@@ -80,10 +80,7 @@ impl EnvVarConfig {
     fn signed_post_from_env() -> BaResult<SignedPost> {
         let url = Self::required(SIGNED_POST_URL_ENV)?;
         let fields = Self::required(SIGNED_POST_FIELDS_ENV)?;
-        Ok(SignedPost::new(
-            url,
-            Self::parse_signed_post_fields(&fields)?,
-        ))
+        SignedPost::new(url, Self::parse_signed_post_fields(&fields)?)
     }
 
     fn parse_signed_post_fields(json: &str) -> BaResult<BTreeMap<String, String>> {

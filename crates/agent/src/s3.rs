@@ -12,7 +12,10 @@
 //! of the uploaded file.
 
 use crate::error::{BaError, BaResult};
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::BTreeMap,
+    path::{Component, Path},
+};
 use tracing::info;
 
 /// The form field that holds the object body in an S3 pre-signed POST.
@@ -20,6 +23,9 @@ pub const FILE_FIELD: &str = "file";
 
 /// The S3 variable replaced with the uploaded file's name.
 const FILENAME_VARIABLE: &str = "${filename}";
+
+/// The form field that selects the S3 object key.
+const KEY_FIELD: &str = "key";
 
 /// A pre-signed POST target for uploading build artifacts.
 #[derive(Debug, Clone)]
@@ -30,23 +36,40 @@ pub struct SignedPost {
 }
 
 impl SignedPost {
-    pub fn new(url: String, fields: BTreeMap<String, String>) -> Self {
-        Self {
+    pub fn new(url: String, fields: BTreeMap<String, String>) -> BaResult<Self> {
+        let key = fields.get(KEY_FIELD).ok_or_else(|| {
+            BaError::Config(format!(
+                "SIGNED_POST_FIELDS must include a {KEY_FIELD} field containing {FILENAME_VARIABLE}"
+            ))
+        })?;
+        if !key.contains(FILENAME_VARIABLE) {
+            return Err(BaError::Config(format!(
+                "SIGNED_POST_FIELDS.{KEY_FIELD} must contain {FILENAME_VARIABLE} so artifacts do not overwrite each other"
+            )));
+        }
+
+        Ok(Self {
             url,
             fields,
             client: reqwest::Client::new(),
-        }
+        })
     }
 
     /// Upload `path` using the configured pre-signed POST.
     pub async fn upload(&self, path: &Path) -> BaResult<()> {
+        let file_name = Self::file_name(path)?;
+        self.upload_named(path, Path::new(&file_name)).await
+    }
+
+    /// Upload `path` using `name` as the S3 object name.
+    pub async fn upload_named(&self, path: &Path, name: &Path) -> BaResult<()> {
         let bytes = tokio::fs::read(path)
             .await
             .map_err(|source| BaError::ReadArtifact {
                 path: path.to_path_buf(),
                 source,
             })?;
-        let file_name = Self::file_name(path)?;
+        let file_name = Self::upload_name(name)?;
 
         let file = reqwest::multipart::Part::bytes(bytes)
             .file_name(file_name.clone())
@@ -84,7 +107,7 @@ impl SignedPost {
             });
         }
 
-        info!(artifact = %path.display(), "uploaded build artifact");
+        info!(artifact = %path.display(), object = %file_name, "uploaded build artifact");
         Ok(())
     }
 
@@ -97,5 +120,29 @@ impl SignedPost {
             .and_then(|name| name.to_str())
             .map(str::to_string)
             .ok_or_else(|| BaError::Config(format!("artifact path {path:?} has no file name")))
+    }
+
+    fn upload_name(path: &Path) -> BaResult<String> {
+        let mut parts = Vec::new();
+        for component in path.components() {
+            match component {
+                Component::Normal(part) => {
+                    let part = part.to_str().ok_or_else(|| {
+                        BaError::Config(format!("artifact name {path:?} is not valid UTF-8"))
+                    })?;
+                    parts.push(part);
+                }
+                _ => {
+                    return Err(BaError::Config(format!(
+                        "artifact name {path:?} must be relative"
+                    )));
+                }
+            }
+        }
+
+        if parts.is_empty() {
+            return Err(BaError::Config(format!("artifact name {path:?} is empty")));
+        }
+        Ok(parts.join("/"))
     }
 }
