@@ -41,6 +41,9 @@ pub enum BaError {
     #[error("client error: {0}")]
     Client(ExitCode),
 
+    #[error("build runner failed: {0}")]
+    RunnerExit(ExitCode),
+
     #[error("build runner exited with {0}")]
     RunnerFailed(ExitStatus),
 
@@ -99,22 +102,36 @@ pub enum BaError {
 impl BaError {
     pub fn from_exit_code(code: i32) -> Option<Self> {
         let code = ExitCode::from_code(code)?;
-        code.is_client_error().then_some(BaError::Client(code))
+        if code == ExitCode::Success {
+            return None;
+        }
+        Some(if code.is_client_error() {
+            BaError::Client(code)
+        } else {
+            BaError::RunnerExit(code)
+        })
     }
 
     pub fn status(&self) -> StatusCode {
         match self {
-            BaError::Client(_) => StatusCode::BAD_REQUEST,
+            BaError::Client(code) | BaError::RunnerExit(code) if code.is_client_error() => {
+                StatusCode::BAD_REQUEST
+            }
             BaError::Timeout(_) => StatusCode::GATEWAY_TIMEOUT,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
-    pub fn message(&self) -> &'static str {
+    pub fn message(&self) -> String {
         match self {
-            BaError::Client(code) => code.message(),
-            BaError::Timeout(_) => "build timed out",
-            _ => "build failed",
+            BaError::Client(code) | BaError::RunnerExit(code) => {
+                format!("{self} (exit code {})", code.code())
+            }
+            _ => self.to_string(),
         }
+    }
+
+    pub fn detail(&self) -> String {
+        self.message()
     }
 }
