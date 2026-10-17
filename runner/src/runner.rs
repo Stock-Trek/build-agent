@@ -1,12 +1,13 @@
 use crate::{
     command::Command,
-    error::{BaError, BaResult},
-    exit_codes::SUCCESS,
+    exit_codes::ExitCode,
     external::{
         enqueue_action, enqueue_metadata, enqueue_preferences, enqueue_signals, enqueue_strategy,
     },
     generated::dto::{PortfolioDto, StrategyContextDto},
 };
+
+type BaResult<T> = Result<T, ExitCode>;
 use prost::Message;
 use stock_trek::{
     Algorithm, ResolvedContext, StrategyContext, prelude::traitreg, signals::SignalContext,
@@ -31,8 +32,8 @@ pub fn run(command: Command) -> i32 {
         } => cmd_signals(algorithm.as_ref(), strategy_context_path),
     });
     match result {
-        Ok(()) => SUCCESS,
-        Err(error) => error.exit_code(),
+        Ok(()) => ExitCode::Success.code(),
+        Err(error) => error.code(),
     }
 }
 
@@ -53,17 +54,17 @@ fn select_algorithm(strategy_name: &str) -> BaResult<Box<dyn Algorithm>> {
         }
     }
     if failed_to_instantiate {
-        return Err(BaError::StrategyCouldNotInstantiate);
+        return Err(ExitCode::StrategyCouldNotInstantiate);
     }
     if !has_instantiable_registration && has_constructorless_registration {
-        return Err(BaError::StrategyHasNoConstructor);
+        return Err(ExitCode::StrategyHasNoConstructor);
     }
-    Err(BaError::StrategyNotFound)
+    Err(ExitCode::StrategyNotFound)
 }
 
 fn cmd_algorithm(algorithm: &dyn Algorithm) -> BaResult<()> {
     let command = algorithm.strategy(&StrategyContext::new());
-    enqueue_strategy(command).map_err(|_| BaError::FailedToEnqueueJson)
+    enqueue_strategy(command).map_err(|_| ExitCode::ServerEntryFailedToEnqueueJson)
 }
 
 fn cmd_execute(
@@ -74,12 +75,12 @@ fn cmd_execute(
     cmd_metadata(algorithm)?;
     let signal_context = load_signal_context(strategy_context_path)?;
     let portfolio_data =
-        std::fs::read(portfolio_path).map_err(|_| BaError::PortfolioFileNotFound)?;
-    let portfolio_dto =
-        PortfolioDto::decode(&portfolio_data[..]).map_err(|_| BaError::PortfolioNotDecoded)?;
+        std::fs::read(portfolio_path).map_err(|_| ExitCode::ServerRunnerPortfolioFileNotFound)?;
+    let portfolio_dto = PortfolioDto::decode(&portfolio_data[..])
+        .map_err(|_| ExitCode::ServerRunnerPortfolioNotDecoded)?;
     let portfolio = portfolio_dto
         .try_into()
-        .map_err(|_| BaError::PortfolioNotCreated)?;
+        .map_err(|_| ExitCode::ServerRunnerPortfolioNotCreated)?;
     let signals = algorithm.signals(&signal_context);
     let strategy_context = StrategyContext::new();
     let command = algorithm.strategy(&strategy_context);
@@ -90,32 +91,32 @@ fn cmd_execute(
     };
     command
         .execute(&mut resolved_context)
-        .map_err(|_| BaError::ResolvingAction)
+        .map_err(|_| ExitCode::BotErrorResolvingAction)
 }
 
 fn cmd_metadata(algorithm: &dyn Algorithm) -> BaResult<()> {
     let name = algorithm.name();
     let description = algorithm.description();
-    enqueue_metadata(name, description).map_err(|_| BaError::FailedToEnqueueJson)
+    enqueue_metadata(name, description).map_err(|_| ExitCode::ServerEntryFailedToEnqueueJson)
 }
 
 fn cmd_preferences(algorithm: &dyn Algorithm) -> BaResult<()> {
     let preferences = algorithm.preferences();
-    enqueue_preferences(preferences).map_err(|_| BaError::FailedToEnqueueJson)
+    enqueue_preferences(preferences).map_err(|_| ExitCode::ServerEntryFailedToEnqueueJson)
 }
 
 fn cmd_signals(algorithm: &dyn Algorithm, strategy_context_path: &str) -> BaResult<()> {
     let signal_context = load_signal_context(strategy_context_path)?;
     let signals = algorithm.signals(&signal_context);
-    enqueue_signals(signals).map_err(|_| BaError::FailedToEnqueueJson)
+    enqueue_signals(signals).map_err(|_| ExitCode::ServerEntryFailedToEnqueueJson)
 }
 
 fn load_signal_context(strategy_context_path: &str) -> BaResult<SignalContext> {
-    let strategy_context_data =
-        std::fs::read(strategy_context_path).map_err(|_| BaError::StrategyContextFileNotFound)?;
+    let strategy_context_data = std::fs::read(strategy_context_path)
+        .map_err(|_| ExitCode::ServerRunnerStrategyContextFileNotFound)?;
     let strategy_context_dto = StrategyContextDto::decode(&strategy_context_data[..])
-        .map_err(|_| BaError::StrategyContextNotDecoded)?;
+        .map_err(|_| ExitCode::ServerRunnerStrategyContextNotDecoded)?;
     strategy_context_dto
         .try_into()
-        .map_err(|_| BaError::StrategyContextNotCreated)
+        .map_err(|_| ExitCode::ServerRunnerStrategyContextNotCreated)
 }

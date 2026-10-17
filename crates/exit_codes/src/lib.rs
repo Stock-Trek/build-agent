@@ -1,70 +1,163 @@
-pub const SUCCESS: i32 = 0;
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExitCode {
+    Success = 0,
 
-// strategy errors
-pub const STRATEGY_NOT_FOUND: i32 = 1;
-pub const STRATEGY_HAS_NO_CONSTRUCTOR: i32 = 2;
-pub const STRATEGY_COULD_NOT_INSTANTIATE: i32 = 3;
+    // strategy errors
+    StrategyNotFound = 1,
+    StrategyHasNoConstructor = 2,
+    StrategyCouldNotInstantiate = 3,
 
-// server errors
-pub const SERVER_ENTRY_INCORRECT_ARG_COUNT: i32 = 101;
-pub const SERVER_ENTRY_FAILED_TO_PARSE_COMMAND: i32 = 102;
-pub const SERVER_ENTRY_FAILED_TO_CONVERT_TO_JSON: i32 = 103;
-pub const SERVER_ENTRY_FAILED_TO_SET_LINKED_FUNCTION: i32 = 104;
-pub const SERVER_ENTRY_FAILED_TO_FIND_LINKED_FUNCTION: i32 = 105;
-pub const SERVER_ENTRY_FAILED_TO_ENQUEUE_JSON: i32 = 106;
-pub const SERVER_ENTRY_FAILED_TO_PARSE_REQUEST: i32 = 107;
-pub const SERVER_ENTRY_INVALID_ARGUMENT: i32 = 108;
+    // server errors
+    ServerEntryIncorrectArgCount = 101,
+    ServerEntryFailedToParseCommand = 102,
+    ServerEntryFailedToConvertToJson = 103,
+    ServerEntryFailedToSetLinkedFunction = 104,
+    ServerEntryFailedToFindLinkedFunction = 105,
+    ServerEntryFailedToEnqueueJson = 106,
+    ServerEntryFailedToParseRequest = 107,
+    ServerEntryInvalidArgument = 108,
 
-pub const SERVER_RUNNER_STRATEGY_CONTEXT_FILE_NOT_FOUND: i32 = 111;
-pub const SERVER_RUNNER_STRATEGY_CONTEXT_NOT_DECODED: i32 = 112;
-pub const SERVER_RUNNER_STRATEGY_CONTEXT_NOT_CREATED: i32 = 113;
+    ServerRunnerStrategyContextFileNotFound = 111,
+    ServerRunnerStrategyContextNotDecoded = 112,
+    ServerRunnerStrategyContextNotCreated = 113,
 
-pub const SERVER_RUNNER_PORTFOLIO_FILE_NOT_FOUND: i32 = 121;
-pub const SERVER_RUNNER_PORTFOLIO_NOT_DECODED: i32 = 122;
-pub const SERVER_RUNNER_PORTFOLIO_NOT_CREATED: i32 = 123;
+    ServerRunnerPortfolioFileNotFound = 121,
+    ServerRunnerPortfolioNotDecoded = 122,
+    ServerRunnerPortfolioNotCreated = 123,
 
-pub const SERVER_RUNNER_CONNECTION_FAILED: i32 = 131;
+    ServerRunnerConnectionFailed = 131,
 
-// bot errors
-pub const BOT_ERROR_CREATING_RESOLVER: i32 = 201;
-pub const BOT_ERROR_CREATING_SCRATCH_PAD: i32 = 202;
-pub const BOT_ERROR_RESOLVING_ACTION: i32 = 203;
-pub const BOT_ERROR_PANIC: i32 = 204;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ClientError {
-    InvalidRequest,
-    StrategyNotFound,
-    StrategyContextNotFound,
-    StrategyContextNotDecoded,
-    StrategyContextNotCreated,
-    PortfolioNotFound,
-    PortfolioNotDecoded,
-    PortfolioNotCreated,
+    // bot errors
+    BotErrorCreatingResolver = 201,
+    BotErrorCreatingScratchPad = 202,
+    BotErrorResolvingAction = 203,
+    BotErrorPanic = 204,
 }
 
-impl ClientError {
-    pub fn from_code(code: i32) -> Option<Self> {
+impl ExitCode {
+    pub const fn code(self) -> i32 {
+        self as i32
+    }
+
+    pub const fn from_code(code: i32) -> Option<Self> {
         Some(match code {
-            SERVER_ENTRY_FAILED_TO_PARSE_REQUEST
-            | SERVER_ENTRY_FAILED_TO_PARSE_COMMAND
-            | SERVER_ENTRY_INVALID_ARGUMENT => Self::InvalidRequest,
-            STRATEGY_NOT_FOUND => Self::StrategyNotFound,
-            SERVER_RUNNER_STRATEGY_CONTEXT_FILE_NOT_FOUND => Self::StrategyContextNotFound,
-            SERVER_RUNNER_STRATEGY_CONTEXT_NOT_DECODED => Self::StrategyContextNotDecoded,
-            SERVER_RUNNER_STRATEGY_CONTEXT_NOT_CREATED => Self::StrategyContextNotCreated,
-            SERVER_RUNNER_PORTFOLIO_FILE_NOT_FOUND => Self::PortfolioNotFound,
-            SERVER_RUNNER_PORTFOLIO_NOT_DECODED => Self::PortfolioNotDecoded,
-            SERVER_RUNNER_PORTFOLIO_NOT_CREATED => Self::PortfolioNotCreated,
+            0 => Self::Success,
+            1 => Self::StrategyNotFound,
+            2 => Self::StrategyHasNoConstructor,
+            3 => Self::StrategyCouldNotInstantiate,
+            101 => Self::ServerEntryIncorrectArgCount,
+            102 => Self::ServerEntryFailedToParseCommand,
+            103 => Self::ServerEntryFailedToConvertToJson,
+            104 => Self::ServerEntryFailedToSetLinkedFunction,
+            105 => Self::ServerEntryFailedToFindLinkedFunction,
+            106 => Self::ServerEntryFailedToEnqueueJson,
+            107 => Self::ServerEntryFailedToParseRequest,
+            108 => Self::ServerEntryInvalidArgument,
+            111 => Self::ServerRunnerStrategyContextFileNotFound,
+            112 => Self::ServerRunnerStrategyContextNotDecoded,
+            113 => Self::ServerRunnerStrategyContextNotCreated,
+            121 => Self::ServerRunnerPortfolioFileNotFound,
+            122 => Self::ServerRunnerPortfolioNotDecoded,
+            123 => Self::ServerRunnerPortfolioNotCreated,
+            131 => Self::ServerRunnerConnectionFailed,
+            201 => Self::BotErrorCreatingResolver,
+            202 => Self::BotErrorCreatingScratchPad,
+            203 => Self::BotErrorResolvingAction,
+            204 => Self::BotErrorPanic,
             _ => return None,
         })
     }
+
+    pub const fn is_client_error(self) -> bool {
+        matches!(
+            self,
+            Self::ServerEntryFailedToParseCommand
+                | Self::ServerEntryFailedToParseRequest
+                | Self::ServerEntryInvalidArgument
+                | Self::StrategyNotFound
+                | Self::ServerRunnerStrategyContextFileNotFound
+                | Self::ServerRunnerStrategyContextNotDecoded
+                | Self::ServerRunnerStrategyContextNotCreated
+                | Self::ServerRunnerPortfolioFileNotFound
+                | Self::ServerRunnerPortfolioNotDecoded
+                | Self::ServerRunnerPortfolioNotCreated
+        )
+    }
+
+    pub const fn message(self) -> &'static str {
+        match self {
+            Self::Success => "accepted",
+            Self::StrategyNotFound => "strategy not found",
+            Self::StrategyHasNoConstructor => "strategy has no constructor",
+            Self::StrategyCouldNotInstantiate => "strategy could not be instantiated",
+            Self::ServerEntryIncorrectArgCount => "incorrect argument count",
+            Self::ServerEntryFailedToParseCommand => "invalid request",
+            Self::ServerEntryFailedToConvertToJson => "failed to convert response to JSON",
+            Self::ServerEntryFailedToSetLinkedFunction => "failed to set linked function",
+            Self::ServerEntryFailedToFindLinkedFunction => "failed to find linked function",
+            Self::ServerEntryFailedToEnqueueJson => "failed to enqueue JSON",
+            Self::ServerEntryFailedToParseRequest => "invalid request",
+            Self::ServerEntryInvalidArgument => "invalid request",
+            Self::ServerRunnerStrategyContextFileNotFound => "strategy context not found",
+            Self::ServerRunnerStrategyContextNotDecoded => "strategy context could not be decoded",
+            Self::ServerRunnerStrategyContextNotCreated => "strategy context could not be created",
+            Self::ServerRunnerPortfolioFileNotFound => "portfolio not found",
+            Self::ServerRunnerPortfolioNotDecoded => "portfolio could not be decoded",
+            Self::ServerRunnerPortfolioNotCreated => "portfolio could not be created",
+            Self::ServerRunnerConnectionFailed => "failed to connect to build runner",
+            Self::BotErrorCreatingResolver => "failed to create resolver",
+            Self::BotErrorCreatingScratchPad => "failed to create scratch pad",
+            Self::BotErrorResolvingAction => "failed to resolve action",
+            Self::BotErrorPanic => "build runner panicked",
+        }
+    }
 }
 
+impl From<ExitCode> for i32 {
+    fn from(code: ExitCode) -> Self {
+        code.code()
+    }
+}
+
+impl std::fmt::Display for ExitCode {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.message())
+    }
+}
+
+impl std::error::Error for ExitCode {}
+
 pub fn is_client_error(code: i32) -> bool {
-    ClientError::from_code(code).is_some()
+    ExitCode::from_code(code).is_some_and(ExitCode::is_client_error)
 }
 
 pub fn is_invalid_request(code: i32) -> bool {
     is_client_error(code)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exit_codes_round_trip() {
+        for code in [
+            ExitCode::Success,
+            ExitCode::StrategyNotFound,
+            ExitCode::ServerRunnerStrategyContextNotDecoded,
+            ExitCode::BotErrorPanic,
+        ] {
+            assert_eq!(ExitCode::from_code(code.code()), Some(code));
+        }
+    }
+
+    #[test]
+    fn client_errors_are_classified() {
+        assert!(ExitCode::StrategyNotFound.is_client_error());
+        assert!(ExitCode::ServerRunnerStrategyContextFileNotFound.is_client_error());
+        assert!(ExitCode::ServerRunnerPortfolioNotDecoded.is_client_error());
+        assert!(!ExitCode::ServerEntryFailedToEnqueueJson.is_client_error());
+        assert!(!ExitCode::BotErrorResolvingAction.is_client_error());
+    }
 }

@@ -23,11 +23,7 @@
 //! {"type":"metadata","payload":{"name":"...","description":"..."}}
 //! ```
 
-use runner::{
-    command::Command,
-    entry::entry,
-    exit_codes::{SERVER_ENTRY_FAILED_TO_PARSE_REQUEST, SERVER_ENTRY_INVALID_ARGUMENT},
-};
+use runner::{command::Command, entry::entry, exit_codes::ExitCode};
 use serde_json::{Value, json};
 use std::{
     ffi::{CString, NulError},
@@ -49,7 +45,7 @@ fn run() -> i32 {
         Ok(command) => command,
         Err(error) => {
             eprintln!("build-runner: invalid request: {error}");
-            return SERVER_ENTRY_FAILED_TO_PARSE_REQUEST;
+            return ExitCode::ServerEntryFailedToParseRequest.code();
         }
     };
 
@@ -57,7 +53,7 @@ fn run() -> i32 {
         Ok(exit_code) => exit_code,
         Err(error) => {
             eprintln!("build-runner: invalid argument: {error}");
-            SERVER_ENTRY_INVALID_ARGUMENT
+            ExitCode::ServerEntryInvalidArgument.code()
         }
     }
 }
