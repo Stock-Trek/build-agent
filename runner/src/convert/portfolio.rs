@@ -1,5 +1,5 @@
 use crate::{
-    convert::string::from_string,
+    convert::string::JsonString,
     generated::dto::{
         AssetCountDto, CexAccountPortfolioDto, CexAccountsDto, PendingOrderDto, PortfolioDto,
     },
@@ -19,7 +19,7 @@ impl TryFrom<PortfolioDto> for Portfolio {
         let PortfolioDto { cex_accounts_dto } = value;
         let mut portfolios = HashMap::new();
         for (cex_name, cex_accounts_dto) in cex_accounts_dto {
-            let cex_id: CexId = from_string(&cex_name)?;
+            let cex_id: CexId = JsonString::deserialize(&cex_name)?;
             let accounts = cex_accounts_dto.try_into()?;
             portfolios.insert(cex_id, accounts);
         }

@@ -1,5 +1,5 @@
 use crate::{
-    convert::{required::IsRequired, string::from_string},
+    convert::{required::IsRequired, string::JsonString},
     generated::dto::{AssetMarketsDto, MarketByBaseDto, MarketByQuoteDto, StrategyContextDto},
 };
 use std::collections::HashMap;
@@ -18,7 +18,7 @@ impl TryFrom<StrategyContextDto> for SignalContext {
         } = value;
         let mut market_data = HashMap::new();
         for (cex_name, asset_markets_dto) in exchange_asset_markets_dto {
-            let cex_id: CexId = from_string(&cex_name)?;
+            let cex_id: CexId = JsonString::deserialize(&cex_name)?;
             market_data.insert(cex_id, asset_markets_dto.try_into()?);
         }
         Ok(SignalContext::new(market_data))

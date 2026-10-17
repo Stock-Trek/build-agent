@@ -25,64 +25,91 @@ unsafe extern "C" {
     );
 }
 
-pub fn enqueue_metadata(name: &str, description: &str) -> StockTrekResult<()> {
-    unsafe {
-        queue_metadata(
-            name.as_ptr(),
-            name.len(),
-            description.as_ptr(),
-            description.len(),
-        );
+pub struct Enqueue;
+
+impl Enqueue {
+    pub fn metadata(name: &str, description: &str) -> StockTrekResult<()> {
+        unsafe {
+            queue_metadata(
+                name.as_ptr(),
+                name.len(),
+                description.as_ptr(),
+                description.len(),
+            );
+        }
+        Ok(())
     }
-    Ok(())
+
+    pub fn preferences(preferences: Preferences) -> StockTrekResult<()> {
+        let preferences_json = Self::to_json(&preferences)?;
+        unsafe {
+            queue_preferences(preferences_json.as_ptr(), preferences_json.len());
+        }
+        Ok(())
+    }
+
+    pub fn signals(signals: Signals) -> StockTrekResult<()> {
+        let signals_json = Self::to_json(&signals)?;
+        unsafe {
+            queue_signals(signals_json.as_ptr(), signals_json.len());
+        }
+        Ok(())
+    }
+
+    pub fn strategy(command: Command) -> StockTrekResult<()> {
+        let strategy_json = Self::to_json(&command)?;
+        unsafe {
+            queue_strategy(strategy_json.as_ptr(), strategy_json.len());
+        }
+        Ok(())
+    }
+
+    pub fn action(
+        action: &ResolvedAction,
+        recovery_policy: &RecoveryPolicy,
+    ) -> StockTrekResult<()> {
+        let action_json = Self::to_json(action)?;
+        let recovery_policy_json = Self::to_json(recovery_policy)?;
+        unsafe {
+            queue_action(
+                action_json.as_ptr(),
+                action_json.len(),
+                recovery_policy_json.as_ptr(),
+                recovery_policy_json.len(),
+            );
+        }
+        Ok(())
+    }
+
+    fn to_json<T: Serialize>(body: &T) -> StockTrekResult<String> {
+        serde_json::to_string(body).map_err(|_| {
+            StockTrekError::Value(ValueError::IncorrectType {
+                expected: "serializable".to_string(),
+                found: "JSON serialization error".to_string(),
+            })
+        })
+    }
+}
+
+pub fn enqueue_metadata(name: &str, description: &str) -> StockTrekResult<()> {
+    Enqueue::metadata(name, description)
 }
 
 pub fn enqueue_preferences(preferences: Preferences) -> StockTrekResult<()> {
-    let preferences_json = to_json(&preferences)?;
-    unsafe {
-        queue_preferences(preferences_json.as_ptr(), preferences_json.len());
-    }
-    Ok(())
+    Enqueue::preferences(preferences)
 }
 
 pub fn enqueue_signals(signals: Signals) -> StockTrekResult<()> {
-    let signals_json = to_json(&signals)?;
-    unsafe {
-        queue_signals(signals_json.as_ptr(), signals_json.len());
-    }
-    Ok(())
+    Enqueue::signals(signals)
 }
 
 pub fn enqueue_strategy(command: Command) -> StockTrekResult<()> {
-    let strategy_json = to_json(&command)?;
-    unsafe {
-        queue_strategy(strategy_json.as_ptr(), strategy_json.len());
-    }
-    Ok(())
+    Enqueue::strategy(command)
 }
 
 pub fn enqueue_action(
     action: &ResolvedAction,
     recovery_policy: &RecoveryPolicy,
 ) -> StockTrekResult<()> {
-    let action_json = to_json(action)?;
-    let recovery_policy_json = to_json(recovery_policy)?;
-    unsafe {
-        queue_action(
-            action_json.as_ptr(),
-            action_json.len(),
-            recovery_policy_json.as_ptr(),
-            recovery_policy_json.len(),
-        );
-    }
-    Ok(())
-}
-
-fn to_json<T: Serialize>(body: &T) -> StockTrekResult<String> {
-    serde_json::to_string(body).map_err(|_| {
-        StockTrekError::Value(ValueError::IncorrectType {
-            expected: "serializable".to_string(),
-            found: "JSON serialization error".to_string(),
-        })
-    })
+    Enqueue::action(action, recovery_policy)
 }

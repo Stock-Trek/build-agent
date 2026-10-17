@@ -19,133 +19,178 @@ use stock_trek::{
     },
 };
 
-fn decimal_dto(value: Decimal) -> DecimalDto {
-    let unpacked = value.unpack();
-    DecimalDto {
-        lo: unpacked.lo,
-        mid: unpacked.mid,
-        hi: unpacked.hi,
-        scale: unpacked.scale,
-        negative: unpacked.negative,
-    }
-}
+struct Fixtures;
 
-fn asset_id_dto(name: &str) -> AssetIdDto {
-    AssetIdDto {
-        asset_id: name.to_string(),
+impl Fixtures {
+    fn decimal_dto(value: Decimal) -> DecimalDto {
+        let unpacked = value.unpack();
+        DecimalDto {
+            lo: unpacked.lo,
+            mid: unpacked.mid,
+            hi: unpacked.hi,
+            scale: unpacked.scale,
+            negative: unpacked.negative,
+        }
     }
-}
 
-fn ohlcv_dto() -> MarketOhlcvDto {
-    MarketOhlcvDto {
-        open_dto: Some(decimal_dto(Decimal::new(1, 0))),
-        high_dto: Some(decimal_dto(Decimal::new(2, 0))),
-        low_dto: Some(decimal_dto(Decimal::new(3, 0))),
-        close_dto: Some(decimal_dto(Decimal::new(4, 0))),
-        volume_dto: Some(decimal_dto(Decimal::new(5, 0))),
-        quote_volume_dto: Some(decimal_dto(Decimal::new(6, 0))),
-        vwap_dto: Some(decimal_dto(Decimal::new(7, 0))),
+    fn asset_id_dto(name: &str) -> AssetIdDto {
+        AssetIdDto {
+            asset_id: name.to_string(),
+        }
     }
-}
 
-fn candle_dto() -> MarketCandleDto {
-    MarketCandleDto {
-        start_time_millis_inc: 1_000,
-        end_time_millis_exc: 2_000,
-        duration_millis: 1_000,
-        is_candle_closed: true,
-        ohlcv_dto: Some(ohlcv_dto()),
-        trade_count: 10,
+    fn ohlcv_dto() -> MarketOhlcvDto {
+        MarketOhlcvDto {
+            open_dto: Some(Self::decimal_dto(Decimal::new(1, 0))),
+            high_dto: Some(Self::decimal_dto(Decimal::new(2, 0))),
+            low_dto: Some(Self::decimal_dto(Decimal::new(3, 0))),
+            close_dto: Some(Self::decimal_dto(Decimal::new(4, 0))),
+            volume_dto: Some(Self::decimal_dto(Decimal::new(5, 0))),
+            quote_volume_dto: Some(Self::decimal_dto(Decimal::new(6, 0))),
+            vwap_dto: Some(Self::decimal_dto(Decimal::new(7, 0))),
+        }
     }
-}
 
-fn quote_dto(price: i64, quantity: i64) -> MarketQuoteDto {
-    MarketQuoteDto {
-        price_dto: Some(decimal_dto(Decimal::new(price, 0))),
-        quantity_dto: Some(decimal_dto(Decimal::new(quantity, 0))),
+    fn candle_dto() -> MarketCandleDto {
+        MarketCandleDto {
+            start_time_millis_inc: 1_000,
+            end_time_millis_exc: 2_000,
+            duration_millis: 1_000,
+            is_candle_closed: true,
+            ohlcv_dto: Some(Self::ohlcv_dto()),
+            trade_count: 10,
+        }
     }
-}
 
-fn tick_dto(timestamp_millis: u64) -> MarketTickDto {
-    MarketTickDto {
-        timestamp_millis,
-        bid_dto: Some(quote_dto(1, 2)),
-        ask_dto: Some(quote_dto(3, 4)),
-        last_dto: Some(quote_dto(5, 6)),
+    fn quote_dto(price: i64, quantity: i64) -> MarketQuoteDto {
+        MarketQuoteDto {
+            price_dto: Some(Self::decimal_dto(Decimal::new(price, 0))),
+            quantity_dto: Some(Self::decimal_dto(Decimal::new(quantity, 0))),
+        }
     }
-}
 
-fn market_dto() -> MarketDto {
-    MarketDto {
-        base_increment_dto: Some(decimal_dto(Decimal::new(1, 2))),
-        quote_increment_dto: Some(decimal_dto(Decimal::new(2, 2))),
-        minimum_notional_dto: Some(decimal_dto(Decimal::new(3, 2))),
-        ticks_dto: Some(MarketTicksDto {
-            ticks_dto: vec![tick_dto(1_000)],
-        }),
-        rolling_dto: HashMap::from([(0, candle_dto())]),
-        aligned_dto: HashMap::from([(
-            0,
-            MarketCandlesDto {
-                candles_dto: vec![candle_dto()],
-            },
-        )]),
-        order_book_dto: Some(MarketOrderBookDto {
-            bids_dto: vec![quote_dto(1, 2)],
-            asks_dto: vec![quote_dto(3, 4)],
-        }),
+    fn tick_dto(timestamp_millis: u64) -> MarketTickDto {
+        MarketTickDto {
+            timestamp_millis,
+            bid_dto: Some(Self::quote_dto(1, 2)),
+            ask_dto: Some(Self::quote_dto(3, 4)),
+            last_dto: Some(Self::quote_dto(5, 6)),
+        }
     }
-}
 
-fn immediate_activation_dto() -> ActivationDto {
-    ActivationDto {
-        activation: Some(activation_dto::Activation::Immediate(
-            ImmediateActivationDto {},
-        )),
+    fn market_dto() -> MarketDto {
+        MarketDto {
+            base_increment_dto: Some(Self::decimal_dto(Decimal::new(1, 2))),
+            quote_increment_dto: Some(Self::decimal_dto(Decimal::new(2, 2))),
+            minimum_notional_dto: Some(Self::decimal_dto(Decimal::new(3, 2))),
+            ticks_dto: Some(MarketTicksDto {
+                ticks_dto: vec![Self::tick_dto(1_000)],
+            }),
+            rolling_dto: HashMap::from([(0, Self::candle_dto())]),
+            aligned_dto: HashMap::from([(
+                0,
+                MarketCandlesDto {
+                    candles_dto: vec![Self::candle_dto()],
+                },
+            )]),
+            order_book_dto: Some(MarketOrderBookDto {
+                bids_dto: vec![Self::quote_dto(1, 2)],
+                asks_dto: vec![Self::quote_dto(3, 4)],
+            }),
+        }
     }
-}
 
-fn price_triggered_activation_dto() -> ActivationDto {
-    ActivationDto {
-        activation: Some(activation_dto::Activation::PriceTriggered(
-            PriceTriggeredActivationDto {
-                activation_price_dto: Some(decimal_dto(Decimal::new(250, 1))),
-                basis: "Mark".to_string(),
-                direction: "Above".to_string(),
-                mode: "Cross".to_string(),
-            },
-        )),
+    fn immediate_activation_dto() -> ActivationDto {
+        ActivationDto {
+            activation: Some(activation_dto::Activation::Immediate(
+                ImmediateActivationDto {},
+            )),
+        }
     }
-}
 
-fn trailing_activation_dto() -> ActivationDto {
-    ActivationDto {
-        activation: Some(activation_dto::Activation::Trailing(
-            TrailingActivationDto {
-                activation_price_dto: Some(decimal_dto(Decimal::new(100, 0))),
-                basis: "Last".to_string(),
-                callback_rate_bps: 50,
-                direction: "Below".to_string(),
-            },
-        )),
+    fn price_triggered_activation_dto() -> ActivationDto {
+        ActivationDto {
+            activation: Some(activation_dto::Activation::PriceTriggered(
+                PriceTriggeredActivationDto {
+                    activation_price_dto: Some(Self::decimal_dto(Decimal::new(250, 1))),
+                    basis: "Mark".to_string(),
+                    direction: "Above".to_string(),
+                    mode: "Cross".to_string(),
+                },
+            )),
+        }
+    }
+
+    fn trailing_activation_dto() -> ActivationDto {
+        ActivationDto {
+            activation: Some(activation_dto::Activation::Trailing(
+                TrailingActivationDto {
+                    activation_price_dto: Some(Self::decimal_dto(Decimal::new(100, 0))),
+                    basis: "Last".to_string(),
+                    callback_rate_bps: 50,
+                    direction: "Below".to_string(),
+                },
+            )),
+        }
+    }
+
+    fn portfolio_dto() -> PortfolioDto {
+        let pending_order = PendingOrderDto {
+            order_request_dto: Some(OrderRequestDto {
+                order_request: Some(order_request_dto::OrderRequest::MarketBuy(
+                    MarketBuyOrderRequestDto {
+                        base_dto: Some(Self::asset_id_dto("Bitcoin")),
+                        quote_dto: Some(Self::asset_id_dto("TetherUSD")),
+                        activation_dto: Some(Self::immediate_activation_dto()),
+                        quote_quantity_dto: Some(Self::decimal_dto(Decimal::new(500, 0))),
+                        tag: "main".to_string(),
+                    },
+                )),
+            }),
+            filled_base_quantity_dto: Some(Self::decimal_dto(Decimal::new(1, 0))),
+            filled_quote_quantity_dto: Some(Self::decimal_dto(Decimal::new(100, 0))),
+        };
+
+        PortfolioDto {
+            cex_accounts_dto: HashMap::from([(
+                "Binance".to_string(),
+                CexAccountsDto {
+                    account_portfolios_dto: HashMap::from([(
+                        "primary".to_string(),
+                        CexAccountPortfolioDto {
+                            asset_counts_dto: vec![AssetCountDto {
+                                asset_id_dto: Some(Self::asset_id_dto("Bitcoin")),
+                                count_dto: Some(Self::decimal_dto(Decimal::new(3, 0))),
+                            }],
+                            pending_orders_dto: HashMap::from([(
+                                "main".to_string(),
+                                PendingOrdersDto {
+                                    pending_orders_dto: vec![pending_order],
+                                },
+                            )]),
+                        },
+                    )]),
+                },
+            )]),
+        }
     }
 }
 
 #[test]
 fn decimal_dto_converts_to_decimal() {
-    let dto = decimal_dto(Decimal::new(3141, 3));
+    let dto = Fixtures::decimal_dto(Decimal::new(3141, 3));
     assert_eq!(dto.to_decimal().unwrap(), Decimal::new(3141, 3));
 }
 
 #[test]
 fn decimal_dto_converts_negative_to_decimal() {
-    let dto = decimal_dto(Decimal::new(-3141, 3));
+    let dto = Fixtures::decimal_dto(Decimal::new(-3141, 3));
     assert_eq!(Decimal::try_from(dto).unwrap(), Decimal::new(-3141, 3));
 }
 
 #[test]
 fn decimal_dto_converts_to_f64() {
-    let dto = decimal_dto(Decimal::new(1234, 2));
+    let dto = Fixtures::decimal_dto(Decimal::new(1234, 2));
     assert_eq!(f64::try_from(dto).unwrap(), 12.34);
 }
 
@@ -200,19 +245,19 @@ fn from_string_errors_on_unknown_variant() {
 #[test]
 fn asset_id_dto_converts() {
     assert_eq!(
-        AssetId::try_from(asset_id_dto("Bitcoin")).unwrap(),
+        AssetId::try_from(Fixtures::asset_id_dto("Bitcoin")).unwrap(),
         AssetId::Bitcoin
     );
 }
 
 #[test]
 fn asset_id_dto_errors_for_unknown_asset() {
-    assert!(AssetId::try_from(asset_id_dto("NotAnAsset")).is_err());
+    assert!(AssetId::try_from(Fixtures::asset_id_dto("NotAnAsset")).is_err());
 }
 
 #[test]
 fn market_ohlcv_dto_converts() {
-    let ohlcv = MarketOhlcv::try_from(ohlcv_dto()).unwrap();
+    let ohlcv = MarketOhlcv::try_from(Fixtures::ohlcv_dto()).unwrap();
     assert_eq!(ohlcv.open, 1.0);
     assert_eq!(ohlcv.high, 2.0);
     assert_eq!(ohlcv.low, 3.0);
@@ -224,14 +269,14 @@ fn market_ohlcv_dto_converts() {
 
 #[test]
 fn market_ohlcv_dto_requires_all_fields() {
-    let mut dto = ohlcv_dto();
+    let mut dto = Fixtures::ohlcv_dto();
     dto.vwap_dto = None;
     assert!(MarketOhlcv::try_from(dto).is_err());
 }
 
 #[test]
 fn market_candle_dto_converts() {
-    let candle = MarketCandle::try_from(candle_dto()).unwrap();
+    let candle = MarketCandle::try_from(Fixtures::candle_dto()).unwrap();
     assert_eq!(candle.start_time_millis_inc, 1_000);
     assert_eq!(candle.end_time_millis_exc, 2_000);
     assert_eq!(candle.duration_millis, 1_000);
@@ -243,28 +288,28 @@ fn market_candle_dto_converts() {
 
 #[test]
 fn market_candle_dto_requires_ohlcv() {
-    let mut dto = candle_dto();
+    let mut dto = Fixtures::candle_dto();
     dto.ohlcv_dto = None;
     assert!(MarketCandle::try_from(dto).is_err());
 }
 
 #[test]
 fn market_quote_dto_converts() {
-    let quote = MarketQuote::try_from(quote_dto(11, 22)).unwrap();
+    let quote = MarketQuote::try_from(Fixtures::quote_dto(11, 22)).unwrap();
     assert_eq!(quote.price, 11.0);
     assert_eq!(quote.quantity, 22.0);
 }
 
 #[test]
 fn market_quote_dto_requires_price_and_quantity() {
-    let mut dto = quote_dto(11, 22);
+    let mut dto = Fixtures::quote_dto(11, 22);
     dto.quantity_dto = None;
     assert!(MarketQuote::try_from(dto).is_err());
 }
 
 #[test]
 fn market_tick_dto_converts() {
-    let tick = MarketTick::try_from(tick_dto(1_234)).unwrap();
+    let tick = MarketTick::try_from(Fixtures::tick_dto(1_234)).unwrap();
     assert_eq!(tick.timestamp_millis, 1_234);
     assert_eq!(tick.bid.price, 1.0);
     assert_eq!(tick.bid.quantity, 2.0);
@@ -276,14 +321,18 @@ fn market_tick_dto_converts() {
 
 #[test]
 fn market_tick_dto_requires_quotes() {
-    let mut dto = tick_dto(1);
+    let mut dto = Fixtures::tick_dto(1);
     dto.ask_dto = None;
     assert!(MarketTick::try_from(dto).is_err());
 }
 
 #[test]
 fn market_tick_vec_converts() {
-    let ticks = MarketTicks::try_from(MarketTickVec(vec![tick_dto(1), tick_dto(2)])).unwrap();
+    let ticks = MarketTicks::try_from(MarketTickVec(vec![
+        Fixtures::tick_dto(1),
+        Fixtures::tick_dto(2),
+    ]))
+    .unwrap();
     assert_eq!(ticks.ticks.len(), 2);
     assert_eq!(ticks.ticks[1].timestamp_millis, 2);
 }
@@ -291,8 +340,8 @@ fn market_tick_vec_converts() {
 #[test]
 fn market_order_book_dto_converts() {
     let order_book = MarketOrderBook::try_from(MarketOrderBookDto {
-        bids_dto: vec![quote_dto(1, 2)],
-        asks_dto: vec![quote_dto(3, 4)],
+        bids_dto: vec![Fixtures::quote_dto(1, 2)],
+        asks_dto: vec![Fixtures::quote_dto(3, 4)],
     })
     .unwrap();
     assert_eq!(order_book.bids.len(), 1);
@@ -305,21 +354,24 @@ fn market_order_book_dto_converts() {
 
 #[test]
 fn market_rolling_window_converts() {
-    let window =
-        MarketRollingWindow::try_from(MarketCandleMap(HashMap::from([(0, candle_dto())]))).unwrap();
+    let window = MarketRollingWindow::try_from(MarketCandleMap(HashMap::from([(
+        0,
+        Fixtures::candle_dto(),
+    )])))
+    .unwrap();
     let candle = window.candles.get(&RollingWindow::Seconds5).unwrap();
     assert_eq!(candle.trade_count, 10);
 }
 
 #[test]
 fn market_rolling_window_rejects_unknown_window() {
-    let map = MarketCandleMap(HashMap::from([(255, candle_dto())]));
+    let map = MarketCandleMap(HashMap::from([(255, Fixtures::candle_dto())]));
     assert!(MarketRollingWindow::try_from(map).is_err());
 }
 
 #[test]
 fn market_rolling_window_rejects_out_of_range_window() {
-    let map = MarketCandleMap(HashMap::from([(256, candle_dto())]));
+    let map = MarketCandleMap(HashMap::from([(256, Fixtures::candle_dto())]));
     assert!(MarketRollingWindow::try_from(map).is_err());
 }
 
@@ -328,7 +380,7 @@ fn market_aligned_window_converts() {
     let window = MarketAlignedWindow::try_from(MarketCandlesMap(HashMap::from([(
         0,
         MarketCandlesDto {
-            candles_dto: vec![candle_dto(), candle_dto()],
+            candles_dto: vec![Fixtures::candle_dto(), Fixtures::candle_dto()],
         },
     )])))
     .unwrap();
@@ -343,7 +395,7 @@ fn market_aligned_window_rejects_unknown_window() {
     let map = MarketCandlesMap(HashMap::from([(
         255,
         MarketCandlesDto {
-            candles_dto: vec![candle_dto()],
+            candles_dto: vec![Fixtures::candle_dto()],
         },
     )]));
     assert!(MarketAlignedWindow::try_from(map).is_err());
@@ -351,7 +403,7 @@ fn market_aligned_window_rejects_unknown_window() {
 
 #[test]
 fn market_dto_converts() {
-    let market = Market::try_from(market_dto()).unwrap();
+    let market = Market::try_from(Fixtures::market_dto()).unwrap();
     assert_eq!(market.base_increment, 0.01);
     assert_eq!(market.quote_increment, 0.02);
     assert_eq!(market.minimum_notional, 0.03);
@@ -364,7 +416,7 @@ fn market_dto_converts() {
 
 #[test]
 fn market_dto_requires_core_fields() {
-    let mut dto = market_dto();
+    let mut dto = Fixtures::market_dto();
     dto.ticks_dto = None;
     assert!(Market::try_from(dto).is_err());
 }
@@ -382,16 +434,16 @@ fn limit_order_request_converts() {
     let dto = OrderRequestDto {
         order_request: Some(order_request_dto::OrderRequest::Limit(
             LimitOrderRequestDto {
-                base_dto: Some(asset_id_dto("Bitcoin")),
-                quote_dto: Some(asset_id_dto("TetherUSD")),
+                base_dto: Some(Fixtures::asset_id_dto("Bitcoin")),
+                quote_dto: Some(Fixtures::asset_id_dto("TetherUSD")),
                 side: "Buy".to_string(),
-                activation_dto: Some(price_triggered_activation_dto()),
-                limit_price_dto: Some(decimal_dto(Decimal::new(100, 0))),
+                activation_dto: Some(Fixtures::price_triggered_activation_dto()),
+                limit_price_dto: Some(Fixtures::decimal_dto(Decimal::new(100, 0))),
                 time_in_force: "GoodTillCancelled".to_string(),
                 quantity_dto: Some(QuantityDto {
-                    quantity: Some(quantity_dto::Quantity::OfBase(decimal_dto(Decimal::new(
-                        5, 0,
-                    )))),
+                    quantity: Some(quantity_dto::Quantity::OfBase(Fixtures::decimal_dto(
+                        Decimal::new(5, 0),
+                    ))),
                 }),
                 tag: "my-tag".to_string(),
             },
@@ -444,10 +496,10 @@ fn market_buy_order_request_converts() {
     let dto = OrderRequestDto {
         order_request: Some(order_request_dto::OrderRequest::MarketBuy(
             MarketBuyOrderRequestDto {
-                base_dto: Some(asset_id_dto("Ethereum")),
-                quote_dto: Some(asset_id_dto("USDCoin")),
-                activation_dto: Some(immediate_activation_dto()),
-                quote_quantity_dto: Some(decimal_dto(Decimal::new(1000, 0))),
+                base_dto: Some(Fixtures::asset_id_dto("Ethereum")),
+                quote_dto: Some(Fixtures::asset_id_dto("USDCoin")),
+                activation_dto: Some(Fixtures::immediate_activation_dto()),
+                quote_quantity_dto: Some(Fixtures::decimal_dto(Decimal::new(1000, 0))),
                 tag: "dca".to_string(),
             },
         )),
@@ -477,10 +529,10 @@ fn market_sell_order_request_converts() {
     let dto = OrderRequestDto {
         order_request: Some(order_request_dto::OrderRequest::MarketSell(
             MarketSellOrderRequestDto {
-                base_dto: Some(asset_id_dto("Solana")),
-                quote_dto: Some(asset_id_dto("TetherUSD")),
-                activation_dto: Some(immediate_activation_dto()),
-                base_quantity_dto: Some(decimal_dto(Decimal::new(2, 0))),
+                base_dto: Some(Fixtures::asset_id_dto("Solana")),
+                quote_dto: Some(Fixtures::asset_id_dto("TetherUSD")),
+                activation_dto: Some(Fixtures::immediate_activation_dto()),
+                base_quantity_dto: Some(Fixtures::decimal_dto(Decimal::new(2, 0))),
                 tag: "exit".to_string(),
             },
         )),
@@ -507,13 +559,13 @@ fn market_sell_order_request_converts() {
 
 #[test]
 fn immediate_activation_dto_converts() {
-    let activation: Activation<Decimal> = immediate_activation_dto().try_into().unwrap();
+    let activation: Activation<Decimal> = Fixtures::immediate_activation_dto().try_into().unwrap();
     assert!(matches!(activation, Activation::Immediate));
 }
 
 #[test]
 fn trailing_activation_dto_converts() {
-    let activation: Activation<Decimal> = trailing_activation_dto().try_into().unwrap();
+    let activation: Activation<Decimal> = Fixtures::trailing_activation_dto().try_into().unwrap();
     match activation {
         Activation::Trailing {
             activation_price,
@@ -539,9 +591,9 @@ fn activation_dto_requires_variant() {
 #[test]
 fn quantity_dto_converts_of_quote() {
     let dto = QuantityDto {
-        quantity: Some(quantity_dto::Quantity::OfQuote(decimal_dto(Decimal::new(
-            25, 1,
-        )))),
+        quantity: Some(quantity_dto::Quantity::OfQuote(Fixtures::decimal_dto(
+            Decimal::new(25, 1),
+        ))),
     };
     let quantity: Quantity<Decimal> = dto.try_into().unwrap();
     match quantity {
@@ -556,50 +608,9 @@ fn quantity_dto_requires_variant() {
     assert!(Quantity::<Decimal>::try_from(dto).is_err());
 }
 
-fn portfolio_dto() -> PortfolioDto {
-    let pending_order = PendingOrderDto {
-        order_request_dto: Some(OrderRequestDto {
-            order_request: Some(order_request_dto::OrderRequest::MarketBuy(
-                MarketBuyOrderRequestDto {
-                    base_dto: Some(asset_id_dto("Bitcoin")),
-                    quote_dto: Some(asset_id_dto("TetherUSD")),
-                    activation_dto: Some(immediate_activation_dto()),
-                    quote_quantity_dto: Some(decimal_dto(Decimal::new(500, 0))),
-                    tag: "main".to_string(),
-                },
-            )),
-        }),
-        filled_base_quantity_dto: Some(decimal_dto(Decimal::new(1, 0))),
-        filled_quote_quantity_dto: Some(decimal_dto(Decimal::new(100, 0))),
-    };
-
-    PortfolioDto {
-        cex_accounts_dto: HashMap::from([(
-            "Binance".to_string(),
-            CexAccountsDto {
-                account_portfolios_dto: HashMap::from([(
-                    "primary".to_string(),
-                    CexAccountPortfolioDto {
-                        asset_counts_dto: vec![AssetCountDto {
-                            asset_id_dto: Some(asset_id_dto("Bitcoin")),
-                            count_dto: Some(decimal_dto(Decimal::new(3, 0))),
-                        }],
-                        pending_orders_dto: HashMap::from([(
-                            "main".to_string(),
-                            PendingOrdersDto {
-                                pending_orders_dto: vec![pending_order],
-                            },
-                        )]),
-                    },
-                )]),
-            },
-        )]),
-    }
-}
-
 #[test]
 fn portfolio_dto_converts() {
-    let portfolio = Portfolio::try_from(portfolio_dto()).unwrap();
+    let portfolio = Portfolio::try_from(Fixtures::portfolio_dto()).unwrap();
     let account_id = AccountId::new("primary");
 
     assert!(portfolio.has_cex_account(&CexId::Binance, &account_id));
@@ -622,7 +633,7 @@ fn portfolio_dto_converts() {
 
 #[test]
 fn portfolio_dto_requires_pending_order_fields() {
-    let mut dto = portfolio_dto();
+    let mut dto = Fixtures::portfolio_dto();
     let accounts = dto.cex_accounts_dto.get_mut("Binance").unwrap();
     let account = accounts.account_portfolios_dto.get_mut("primary").unwrap();
     let orders = account.pending_orders_dto.get_mut("main").unwrap();
@@ -638,10 +649,10 @@ fn strategy_context_dto_converts() {
             "Binance".to_string(),
             AssetMarketsDto {
                 markets_by_base_dto: vec![MarketByBaseDto {
-                    base_asset_id_dto: Some(asset_id_dto("Bitcoin")),
+                    base_asset_id_dto: Some(Fixtures::asset_id_dto("Bitcoin")),
                     markets_by_quote_dto: vec![MarketByQuoteDto {
-                        quote_asset_id_dto: Some(asset_id_dto("TetherUSD")),
-                        market_dto: Some(market_dto()),
+                        quote_asset_id_dto: Some(Fixtures::asset_id_dto("TetherUSD")),
+                        market_dto: Some(Fixtures::market_dto()),
                     }],
                 }],
             },

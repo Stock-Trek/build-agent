@@ -23,116 +23,175 @@
 //! {"type":"metadata","payload":{"name":"...","description":"..."}}
 //! ```
 
-use runner::{command::Command, entry::entry, exit_codes::ExitCode};
+use runner::{command::Command, entry::Entry, exit_codes::ExitCode};
 use serde_json::{Value, json};
 use std::{
     ffi::{CString, NulError},
     io::{self, Read},
 };
 
+struct BuildRunner;
+
+impl BuildRunner {
+    fn run() -> i32 {
+        let mut body = String::new();
+        if let Err(error) = io::stdin().read_to_string(&mut body) {
+            eprintln!("build-runner: failed to read stdin: {error}");
+            return 1;
+        }
+
+        let command = match Self::parse_request(&body) {
+            Ok(command) => command,
+            Err(error) => {
+                eprintln!("build-runner: invalid request: {error}");
+                return ExitCode::ServerEntryFailedToParseRequest.code();
+            }
+        };
+
+        match Self::invoke(&command) {
+            Ok(exit_code) => exit_code,
+            Err(error) => {
+                eprintln!("build-runner: invalid argument: {error}");
+                ExitCode::ServerEntryInvalidArgument.code()
+            }
+        }
+    }
+
+    /// Deserialise the request body into a `Command`.
+    fn parse_request(body: &str) -> Result<Command, String> {
+        if body.trim().is_empty() {
+            return Err("body is empty".to_string());
+        }
+        serde_json::from_str(body)
+            .map_err(|error| format!("body is not a valid run request: {error}"))
+    }
+
+    /// Invoke the algorithm entry point with the resolved arguments.
+    fn invoke(command: &Command) -> Result<i32, NulError> {
+        let (name, strategy_name, strategy_context, portfolio) = Self::fields(command);
+        let program = Self::cstring("build-runner")?;
+        let command_name = Self::cstring(name)?;
+        let strategy_name = Self::cstring(strategy_name)?;
+        let strategy_context = Self::cstring(strategy_context)?;
+        let portfolio = Self::cstring(portfolio)?;
+        let argv = [
+            program.as_ptr(),
+            command_name.as_ptr(),
+            strategy_name.as_ptr(),
+            strategy_context.as_ptr(),
+            portfolio.as_ptr(),
+        ];
+
+        // Safety: `argv` holds valid, NUL-terminated C strings for the duration of
+        // the call and `argv.len()` matches `EXPECTED_ARG_COUNT`.
+        Ok(unsafe { Entry::run(argv.len() as i32, argv.as_ptr()) })
+    }
+
+    /// Project a `Command` onto the fixed argv layout expected by `entry`.
+    fn fields(command: &Command) -> (&'static str, &str, &str, &str) {
+        match command {
+            Command::Algorithm { strategy_name } => ("Algorithm", strategy_name, "", ""),
+            Command::Execute {
+                strategy_name,
+                strategy_context_path,
+                portfolio_path,
+            } => (
+                "Execute",
+                strategy_name,
+                strategy_context_path,
+                portfolio_path,
+            ),
+            Command::Metadata { strategy_name } => ("Metadata", strategy_name, "", ""),
+            Command::Preferences { strategy_name } => ("Preferences", strategy_name, "", ""),
+            Command::Signals {
+                strategy_name,
+                strategy_context_path,
+            } => ("Signals", strategy_name, strategy_context_path, ""),
+            // `Command` is `#[non_exhaustive]`.
+            _ => ("Algorithm", "", "", ""),
+        }
+    }
+
+    fn cstring(value: &str) -> Result<CString, NulError> {
+        CString::new(value)
+    }
+
+    /// Borrow a `(pointer, length)` pair as a byte slice.
+    ///
+    /// # Safety
+    /// When `length` is non-zero, `pointer` must be valid for reads of `length`
+    /// bytes for the duration of the borrow.
+    unsafe fn bytes<'a>(pointer: *const u8, length: usize) -> &'a [u8] {
+        if pointer.is_null() || length == 0 {
+            &[]
+        } else {
+            // Safety: upheld by the caller.
+            unsafe { std::slice::from_raw_parts(pointer, length) }
+        }
+    }
+
+    /// Print a queued value as a JSON line.
+    fn emit(kind: &str, payload: Value) {
+        println!("{}", json!({ "type": kind, "payload": payload }));
+    }
+
+    unsafe fn queue_metadata(
+        name_ptr: *const u8,
+        name_len: usize,
+        description_ptr: *const u8,
+        description_len: usize,
+    ) {
+        // Safety: the ABI guarantees the pointer/length pairs are valid.
+        let name = unsafe { Self::bytes(name_ptr, name_len) };
+        let description = unsafe { Self::bytes(description_ptr, description_len) };
+        Self::emit(
+            "metadata",
+            json!({
+                "name": String::from_utf8_lossy(name),
+                "description": String::from_utf8_lossy(description),
+            }),
+        );
+    }
+
+    unsafe fn queue_preferences(preferences_ptr: *const u8, preferences_len: usize) {
+        // Safety: the ABI guarantees the pointer/length pair is valid.
+        let preferences = unsafe { Self::bytes(preferences_ptr, preferences_len) };
+        Self::emit("preferences", json!(String::from_utf8_lossy(preferences)));
+    }
+
+    unsafe fn queue_signals(signals_ptr: *const u8, signals_len: usize) {
+        // Safety: the ABI guarantees the pointer/length pair is valid.
+        let signals = unsafe { Self::bytes(signals_ptr, signals_len) };
+        Self::emit("signals", json!(String::from_utf8_lossy(signals)));
+    }
+
+    unsafe fn queue_strategy(strategy_ptr: *const u8, strategy_len: usize) {
+        // Safety: the ABI guarantees the pointer/length pair is valid.
+        let strategy = unsafe { Self::bytes(strategy_ptr, strategy_len) };
+        Self::emit("strategy", json!(String::from_utf8_lossy(strategy)));
+    }
+
+    unsafe fn queue_action(
+        action_ptr: *const u8,
+        action_len: usize,
+        recovery_policy_ptr: *const u8,
+        recovery_policy_len: usize,
+    ) {
+        // Safety: the ABI guarantees the pointer/length pairs are valid.
+        let action = unsafe { Self::bytes(action_ptr, action_len) };
+        let recovery_policy = unsafe { Self::bytes(recovery_policy_ptr, recovery_policy_len) };
+        Self::emit(
+            "action",
+            json!({
+                "action": String::from_utf8_lossy(action),
+                "recoveryPolicy": String::from_utf8_lossy(recovery_policy),
+            }),
+        );
+    }
+}
+
 fn main() {
-    std::process::exit(run());
-}
-
-fn run() -> i32 {
-    let mut body = String::new();
-    if let Err(error) = io::stdin().read_to_string(&mut body) {
-        eprintln!("build-runner: failed to read stdin: {error}");
-        return 1;
-    }
-
-    let command = match parse_request(&body) {
-        Ok(command) => command,
-        Err(error) => {
-            eprintln!("build-runner: invalid request: {error}");
-            return ExitCode::ServerEntryFailedToParseRequest.code();
-        }
-    };
-
-    match invoke(&command) {
-        Ok(exit_code) => exit_code,
-        Err(error) => {
-            eprintln!("build-runner: invalid argument: {error}");
-            ExitCode::ServerEntryInvalidArgument.code()
-        }
-    }
-}
-
-/// Deserialise the request body into a `Command`.
-fn parse_request(body: &str) -> Result<Command, String> {
-    if body.trim().is_empty() {
-        return Err("body is empty".to_string());
-    }
-    serde_json::from_str(body).map_err(|error| format!("body is not a valid run request: {error}"))
-}
-
-/// Invoke the algorithm entry point with the resolved arguments.
-fn invoke(command: &Command) -> Result<i32, NulError> {
-    let (name, strategy_name, strategy_context, portfolio) = fields(command);
-    let program = cstring("build-runner")?;
-    let command_name = cstring(name)?;
-    let strategy_name = cstring(strategy_name)?;
-    let strategy_context = cstring(strategy_context)?;
-    let portfolio = cstring(portfolio)?;
-    let argv = [
-        program.as_ptr(),
-        command_name.as_ptr(),
-        strategy_name.as_ptr(),
-        strategy_context.as_ptr(),
-        portfolio.as_ptr(),
-    ];
-
-    // Safety: `argv` holds valid, NUL-terminated C strings for the duration of
-    // the call and `argv.len()` matches `EXPECTED_ARG_COUNT`.
-    Ok(unsafe { entry(argv.len() as i32, argv.as_ptr()) })
-}
-
-/// Project a `Command` onto the fixed argv layout expected by `entry`.
-fn fields(command: &Command) -> (&'static str, &str, &str, &str) {
-    match command {
-        Command::Algorithm { strategy_name } => ("Algorithm", strategy_name, "", ""),
-        Command::Execute {
-            strategy_name,
-            strategy_context_path,
-            portfolio_path,
-        } => (
-            "Execute",
-            strategy_name,
-            strategy_context_path,
-            portfolio_path,
-        ),
-        Command::Metadata { strategy_name } => ("Metadata", strategy_name, "", ""),
-        Command::Preferences { strategy_name } => ("Preferences", strategy_name, "", ""),
-        Command::Signals {
-            strategy_name,
-            strategy_context_path,
-        } => ("Signals", strategy_name, strategy_context_path, ""),
-        // `Command` is `#[non_exhaustive]`.
-        _ => ("Algorithm", "", "", ""),
-    }
-}
-
-fn cstring(value: &str) -> Result<CString, NulError> {
-    CString::new(value)
-}
-
-/// Borrow a `(pointer, length)` pair as a byte slice.
-///
-/// # Safety
-/// When `length` is non-zero, `pointer` must be valid for reads of `length`
-/// bytes for the duration of the borrow.
-unsafe fn bytes<'a>(pointer: *const u8, length: usize) -> &'a [u8] {
-    if pointer.is_null() || length == 0 {
-        &[]
-    } else {
-        // Safety: upheld by the caller.
-        unsafe { std::slice::from_raw_parts(pointer, length) }
-    }
-}
-
-/// Print a queued value as a JSON line.
-fn emit(kind: &str, payload: Value) {
-    println!("{}", json!({ "type": kind, "payload": payload }));
+    std::process::exit(BuildRunner::run());
 }
 
 #[unsafe(no_mangle)]
@@ -142,37 +201,24 @@ unsafe extern "C" fn queue_metadata(
     description_ptr: *const u8,
     description_len: usize,
 ) {
-    // Safety: the ABI guarantees the pointer/length pairs are valid.
-    let name = unsafe { bytes(name_ptr, name_len) };
-    let description = unsafe { bytes(description_ptr, description_len) };
-    emit(
-        "metadata",
-        json!({
-            "name": String::from_utf8_lossy(name),
-            "description": String::from_utf8_lossy(description),
-        }),
-    );
+    unsafe {
+        BuildRunner::queue_metadata(name_ptr, name_len, description_ptr, description_len);
+    }
 }
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn queue_preferences(preferences_ptr: *const u8, preferences_len: usize) {
-    // Safety: the ABI guarantees the pointer/length pair is valid.
-    let preferences = unsafe { bytes(preferences_ptr, preferences_len) };
-    emit("preferences", json!(String::from_utf8_lossy(preferences)));
+    unsafe { BuildRunner::queue_preferences(preferences_ptr, preferences_len) };
 }
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn queue_signals(signals_ptr: *const u8, signals_len: usize) {
-    // Safety: the ABI guarantees the pointer/length pair is valid.
-    let signals = unsafe { bytes(signals_ptr, signals_len) };
-    emit("signals", json!(String::from_utf8_lossy(signals)));
+    unsafe { BuildRunner::queue_signals(signals_ptr, signals_len) };
 }
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn queue_strategy(strategy_ptr: *const u8, strategy_len: usize) {
-    // Safety: the ABI guarantees the pointer/length pair is valid.
-    let strategy = unsafe { bytes(strategy_ptr, strategy_len) };
-    emit("strategy", json!(String::from_utf8_lossy(strategy)));
+    unsafe { BuildRunner::queue_strategy(strategy_ptr, strategy_len) };
 }
 
 #[unsafe(no_mangle)]
@@ -182,14 +228,12 @@ unsafe extern "C" fn queue_action(
     recovery_policy_ptr: *const u8,
     recovery_policy_len: usize,
 ) {
-    // Safety: the ABI guarantees the pointer/length pairs are valid.
-    let action = unsafe { bytes(action_ptr, action_len) };
-    let recovery_policy = unsafe { bytes(recovery_policy_ptr, recovery_policy_len) };
-    emit(
-        "action",
-        json!({
-            "action": String::from_utf8_lossy(action),
-            "recoveryPolicy": String::from_utf8_lossy(recovery_policy),
-        }),
-    );
+    unsafe {
+        BuildRunner::queue_action(
+            action_ptr,
+            action_len,
+            recovery_policy_ptr,
+            recovery_policy_len,
+        );
+    }
 }
